@@ -1,0 +1,6 @@
+{
+  "name": "PC Bodega",
+  "description": "An online store for PC parts where payments are processed via live chat.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
