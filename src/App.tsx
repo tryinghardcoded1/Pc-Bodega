@@ -35,7 +35,7 @@ import {
   User as FirebaseUser,
   signOut
 } from 'firebase/auth';
-import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, doc, setDoc, where, getDocs, getDoc, deleteDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, doc, setDoc, where, getDocs, getDoc, deleteDoc, limit } from 'firebase/firestore';
 import { 
   auth, 
   db, 
@@ -1294,7 +1294,15 @@ function AdminDashboard({ onOpenChat }: { onOpenChat: (id: string) => void }) {
                         <div>
                            <div className="flex items-center gap-3 mb-2">
                               <h3 className="text-lg font-bold">{order.name}</h3>
-                              <span className="text-[10px] bg-orange-500/20 text-orange-400 px-2 py-0.5 rounded font-bold uppercase tracking-tighter border border-orange-500/20">{order.status}</span>
+                              <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-tighter border ${
+                                 order.status === 'pending' ? 'bg-orange-500/20 text-orange-400 border-orange-500/20' :
+                                 order.status === 'paid' ? 'bg-sky-500/20 text-sky-400 border-sky-500/20' :
+                                 'bg-green-500/20 text-green-400 border-green-500/20'
+                               }`}>
+                                 {order.status === 'pending' ? 'Unpaid' : 
+                                  order.status === 'paid' ? 'Paid (Deliver Today)' : 
+                                  order.status}
+                               </span>
                            </div>
                            <div className="flex flex-col gap-1 text-xs text-slate-400">
                               <span className="flex items-center gap-2 lowercase text-sky-400"><span className="uppercase text-slate-600 font-bold">Email:</span> {order.email}</span>
@@ -1361,9 +1369,25 @@ function AdminDashboard({ onOpenChat }: { onOpenChat: (id: string) => void }) {
                            >
                               Delete <Trash2 className="w-3 h-3" />
                            </button>
-                           <button className="text-xs font-bold text-sky-500 hover:text-white uppercase tracking-widest transition-colors flex items-center gap-2">
-                              Update Status <ArrowRight className="w-3 h-3" />
-                           </button>
+                           <div className="flex items-center gap-2">
+                              <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Update:</span>
+                              <select 
+                                value={order.status}
+                                onChange={async (e) => {
+                                  try {
+                                    await setDoc(doc(db, 'orders', order.id), { status: e.target.value }, { merge: true });
+                                  } catch (err) {
+                                    console.error('Error updating status:', err);
+                                  }
+                                }}
+                                className="bg-black/40 border border-white/10 text-[10px] font-bold uppercase rounded p-1 text-sky-400 outline-none"
+                              >
+                                <option value="pending">Unpaid</option>
+                                <option value="paid">Paid (Deliver Today)</option>
+                                <option value="completed">Completed</option>
+                                <option value="cancelled">Cancelled</option>
+                              </select>
+                           </div>
                         </div>
                      </div>
                   </motion.div>
@@ -1412,9 +1436,28 @@ function AdminChatView({ chatId, onBack, pendingOrder, onClearPending }: { chatI
   const [inputText, setInputText] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [zoomImage, setZoomImage] = useState<string | null>(null);
+  const [isTyping, setIsTyping] = useState(false);
+  const [queueInfo] = useState(() => ({
+    pos: Math.floor(Math.random() * 3) + 1,
+    time: [3, 6, 7][Math.floor(Math.random() * 3)]
+  }));
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const initialized = useRef(false);
+
+  // Simulated typing effect when admin is not around
+  useEffect(() => {
+    const isUserAdmin = auth.currentUser?.email === 'paoloesteban75@gmail.com' || auth.currentUser?.email === 'akolangpo@pcbodega.com';
+    if (!isUserAdmin) {
+      const interval = setInterval(() => {
+        if (Math.random() > 0.7) {
+          setIsTyping(true);
+          setTimeout(() => setIsTyping(false), 3000);
+        }
+      }, 10000);
+      return () => clearInterval(interval);
+    }
+  }, []);
 
   useEffect(() => {
     const q = query(collection(db, 'chats', chatId, 'messages'), orderBy('createdAt', 'asc'));
@@ -1551,11 +1594,40 @@ function AdminChatView({ chatId, onBack, pendingOrder, onClearPending }: { chatI
           <div className="p-3 sm:p-4 bg-black/40 border-b border-white/5 flex items-center justify-between">
              <div className="flex items-center gap-2 sm:gap-3">
                 <div className="w-8 h-8 rounded-full bg-sky-500/20 flex items-center justify-center font-bold text-sky-400">?</div>
-                <span className="font-bold text-xs sm:text-sm">Customer Support Chat</span>
+                <div className="flex flex-col">
+                  <span className="font-bold text-xs sm:text-sm">Customer Support Chat</span>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                    <span className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Agent Online</span>
+                  </div>
+                </div>
              </div>
              <span className="text-[10px] text-slate-500 uppercase font-bold px-2 py-1 bg-white/5 rounded">Live Thread</span>
           </div>
-          <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 custom-scrollbar">
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 custom-scrollbar relative">
+             {!(auth.currentUser?.email === 'paoloesteban75@gmail.com' || auth.currentUser?.email === 'akolangpo@pcbodega.com') && (
+               <motion.div 
+                 initial={{ opacity: 0, y: -10 }}
+                 animate={{ opacity: 1, y: 0 }}
+                 className="sticky top-0 z-10 bg-sky-500/10 border border-sky-500/20 backdrop-blur-md rounded-xl p-3 sm:p-4 mb-4 shadow-lg text-center"
+               >
+                 <div className="flex items-center justify-center gap-3 mb-2">
+                   <div className="flex flex-col items-center">
+                     <span className="text-[10px] text-sky-400 font-bold uppercase tracking-wider">Queue Position</span>
+                     <span className="text-xl font-black text-white">#{queueInfo.pos}</span>
+                   </div>
+                   <div className="w-px h-8 bg-sky-500/20" />
+                   <div className="flex flex-col items-center">
+                     <span className="text-[10px] text-sky-400 font-bold uppercase tracking-wider">Est. Wait</span>
+                     <span className="text-xl font-black text-white">{queueInfo.time}m</span>
+                   </div>
+                 </div>
+                 <p className="text-[10px] text-slate-400 leading-tight">
+                   Please leave your <span className="text-sky-400">concern</span> and <span className="text-sky-400">contact email/number</span>. We'll get back to you shortly!
+                 </p>
+               </motion.div>
+             )}
+
              {pendingOrder && (
                <div className="mx-auto max-w-sm mb-6 bg-sky-500/10 border border-sky-500/30 rounded-2xl p-4 shadow-xl">
                  <div className="flex items-start gap-4 mb-3 border-b border-sky-500/20 pb-4">
@@ -1660,6 +1732,21 @@ function AdminChatView({ chatId, onBack, pendingOrder, onClearPending }: { chatI
                </div>
              ))}
              <div ref={scrollRef} />
+
+             {isTyping && (
+               <motion.div 
+                 initial={{ opacity: 0, x: -10 }}
+                 animate={{ opacity: 1, x: 0 }}
+                 className="flex items-center gap-2 p-2 bg-white/5 rounded-lg w-fit ml-2 mb-2"
+               >
+                 <div className="flex gap-1">
+                   <div className="w-1 h-1 bg-sky-500 rounded-full animate-bounce [animation-delay:-0.3s]" />
+                   <div className="w-1 h-1 bg-sky-500 rounded-full animate-bounce [animation-delay:-0.15s]" />
+                   <div className="w-1 h-1 bg-sky-500 rounded-full animate-bounce" />
+                 </div>
+                 <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Agent is typing...</span>
+               </motion.div>
+             )}
           </div>
           <form onSubmit={sendMessage} className="p-3 sm:p-4 bg-black/40 border-t border-white/5 flex gap-2">
              <input 
@@ -1841,12 +1928,12 @@ function UserDashboardView({ user, profile, onSignOut, onNavigate, unreadCount }
        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 sm:gap-8">
           {/* Sidebar */}
           <div className="lg:col-span-1 space-y-4">
-             <div className="bg-bg-card border border-white/5 rounded-3xl p-6 text-center">
-                <div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto rounded-full border-4 border-sky-500/20 p-1 mb-4 shrink-0">
+             <div className="bg-bg-card border border-white/5 rounded-3xl p-6 text-center shadow-2xl">
+                <div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto rounded-full border-4 border-sky-500/20 p-1 mb-4 shrink-0 shadow-lg">
                    <img src={user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName || user.email}&background=0ea5e9&color=fff`} className="w-full h-full rounded-full object-cover" />
                 </div>
-                <h3 className="font-bold text-base sm:text-lg leading-tight mb-1 truncate">{profile?.displayName || user.displayName || 'User'}</h3>
-                <p className="text-[10px] text-sky-500 font-bold uppercase tracking-widest leading-none">{user.emailVerified ? 'Verified' : 'Unverified'}</p>
+                <h3 className="font-bold text-base sm:text-lg leading-tight mb-1 truncate">{profile?.displayName || user.displayName || 'Hardware Enthusiast'}</h3>
+                <p className="text-[10px] text-sky-500 font-bold uppercase tracking-widest leading-none">{user.emailVerified ? 'Verified Account' : 'Unverified Email'}</p>
              </div>
 
              <div className="bg-bg-card border border-white/5 rounded-2xl sm:rounded-3xl p-2 flex lg:flex-col gap-1 overflow-x-auto lg:overflow-visible no-scrollbar">
@@ -1893,7 +1980,15 @@ function UserDashboardView({ user, profile, onSignOut, onNavigate, unreadCount }
                                  <div>
                                     <div className="flex items-center gap-3 mb-2">
                                        <span className="text-xs font-mono font-bold text-slate-500">#{order.trackingNumber || 'PENDING'}</span>
-                                       <span className="text-[10px] bg-sky-500/20 text-sky-400 px-2 py-0.5 rounded font-bold uppercase">{order.status}</span>
+                                       <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${
+                                         order.status === 'pending' ? 'bg-orange-500/20 text-orange-400' :
+                                         order.status === 'paid' ? 'bg-sky-500/20 text-sky-400' :
+                                         'bg-green-500/20 text-green-400'
+                                       }`}>
+                                         {order.status === 'pending' ? 'Awaiting Payment Verification' : 
+                                          order.status === 'paid' ? 'Payment Confirmed - Same Day Delivery' : 
+                                          order.status}
+                                       </span>
                                     </div>
                                     <p className="text-xs text-slate-400">Total: {formatPHP(order.total)} • Placed on {order.createdAt?.toDate?.()?.toLocaleDateString()}</p>
                                  </div>
@@ -2020,20 +2115,54 @@ function TrackingView() {
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
 
+  const getStatusLabel = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'pending': return 'Awaiting Payment Verification';
+      case 'paid': return 'Payment Confirmed - Same Day Delivery';
+      case 'shipped': return 'Dispatched / In Transit';
+      case 'delivered': 
+      case 'completed': return 'Order Fulfilled';
+      case 'cancelled': return 'Order Cancelled';
+      default: return status;
+    }
+  };
+
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!tn.trim()) return;
     setLoading(true);
     
-    // As per user request: "any number generated... status must be will be delivered the next day during office hours"
-    setTimeout(() => {
+    try {
+      const q = query(collection(db, 'orders'), where('trackingNumber', '==', tn.trim().toUpperCase()), limit(1));
+      const snap = await getDocs(q);
+      
+      if (!snap.empty) {
+        const orderData = snap.docs[0].data();
+        setResult({
+          status: getStatusLabel(orderData.status),
+          text: orderData.status === 'paid' ? 'Your payment has been confirmed! Your order is scheduled for Same-Day Delivery.' : 
+                orderData.status === 'pending' ? 'Awaiting payment verification. Please ensure you have sent your proof of payment via support.' :
+                'Your order is being processed and will be delivered shortly.',
+          number: tn.toUpperCase()
+        });
+      } else {
+        // Fallback for demo tracking numbers or not found
+        setResult({
+          status: 'Record Not Found',
+          text: 'The tracking number provided does not match any records in our system. Please check the code and try again.',
+          number: tn.toUpperCase()
+        });
+      }
+    } catch (err) {
+      console.error('Tracking error:', err);
       setResult({
-        status: 'Processing (On the way)',
-        text: 'Your order will be delivered the next day during office hours.',
+        status: 'Error',
+        text: 'Unable to connect to the tracking server. Please try again later.',
         number: tn.toUpperCase()
       });
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   };
 
   return (
@@ -2078,12 +2207,24 @@ function TrackingView() {
           </motion.div>
        )}
 
-       <div className="w-full rounded-3xl overflow-hidden border border-white/10 bg-black/40 h-[400px] shadow-2xl">
-          {/* User provided link: https://maps.app.goo.gl/1VvRidEFBkwzq8Th6 */}
+       <div className="w-full rounded-2xl overflow-hidden border border-white/10 bg-black/40 shadow-2xl relative">
+          <div className="p-4 bg-sky-500/10 border-b border-sky-500/20 text-center">
+             <p className="text-xs sm:text-sm font-bold text-sky-400">
+               Note: For real-time delivery status,{' '}
+               <a 
+                 href="https://pcbod-drivertracker.vercel.app/" 
+                 target="_blank" 
+                 rel="noopener noreferrer" 
+                 className="underline hover:text-white transition-colors"
+               >
+                 click here
+               </a>
+             </p>
+          </div>
           <iframe 
-            src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3860.672321453267!2d121.0116817!3d14.61719!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3397b7af9102ca17%3A0xc07c70ae83f1469e!2sPC%20Bodega!5e0!3m2!1sen!2sph!4v1714652000000!5m2!1sen!2sph"
+            src="https://www.google.com/maps?saddr=Matulungin,Marilao,3019+Bulacan&daddr=109+Mayon+St,Taguig&output=embed"
             width="100%" 
-            height="100%" 
+            height="450" 
             style={{ border: 0 }} 
             allowFullScreen 
             loading="lazy" 
