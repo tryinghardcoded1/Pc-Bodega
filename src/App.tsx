@@ -294,10 +294,17 @@ export default function App() {
   const [pendingOrder, setPendingOrder] = useState<any>(null);
   const [appliedVoucher, setAppliedVoucher] = useState<string | null>(null);
 
-  const cartDiscount = appliedVoucher === 'LABORDAY1000' ? cart.reduce((acc, item) => {
+  const cartDiscount = (appliedVoucher === 'LABORDAY1000' || appliedVoucher === 'PCBBODEGA') ? cart.reduce((acc, item) => {
     let discount = 0;
-    if (item.product.id === 'p5') discount = 990;
-    if (item.product.id === 'p4') discount = 390;
+    // Specific discounts for Samsung SSDs as requested
+    // p4: 1TB NVMe, p5: 2TB NVMe, p6: T7 Portable (variations)
+    if (item.product.name.toLowerCase().includes('samsung') && item.product.name.toLowerCase().includes('ssd')) {
+      if (item.product.id === 'p5' || (item.product.id === 'p6' && item.selectedVariant?.name.includes('2 Terabyte'))) {
+        discount = 890;
+      } else if (item.product.id === 'p4' || (item.product.id === 'p6' && item.selectedVariant?.name.includes('1 Terabyte'))) {
+        discount = 390;
+      }
+    }
     return acc + (discount * item.quantity);
   }, 0) : 0;
 
@@ -2001,9 +2008,10 @@ function CheckoutView({ cart, subtotal, discount, appliedVoucher, setAppliedVouc
   const total = subtotal - discount + DELIVERY_FEE;
 
   const handleApplyVoucher = () => {
-    if (voucherInput.toUpperCase() === 'LABORDAY1000') {
-      setAppliedVoucher('LABORDAY1000');
-      alert('Voucher applied successfully!');
+    const code = voucherInput.toUpperCase();
+    if (code === 'LABORDAY1000' || code === 'PCBBODEGA') {
+      setAppliedVoucher(code);
+      alert(`${code} applied successfully!`);
     } else {
       alert('Invalid voucher code');
     }
@@ -2090,9 +2098,9 @@ function CheckoutView({ cart, subtotal, discount, appliedVoucher, setAppliedVouc
                     Apply
                   </button>
                 </div>
-                {appliedVoucher === 'LABORDAY1000' && (
+                {(appliedVoucher === 'LABORDAY1000' || appliedVoucher === 'PCBBODEGA') && (
                   <div className="mt-3 text-sky-400 text-[10px] font-bold uppercase tracking-widest flex items-center gap-2">
-                    <ShieldCheck className="w-3 h-3" /> LABORDAY1000 Applied
+                    <ShieldCheck className="w-3 h-3" /> {appliedVoucher} Applied
                   </div>
                 )}
               </div>
