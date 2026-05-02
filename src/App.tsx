@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+import Markdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { 
   ShoppingCart, 
   X, 
@@ -345,7 +347,7 @@ export default function App() {
           unsubUnread = onSnapshot(doc(db, 'chats', currUser.uid), (docSnap) => {
             if (docSnap.exists() && docSnap.data().hasUserUnread) {
               setUnreadCount(1);
-              if (view !== 'user_dashboard') {
+              if (view !== 'dashboard') {
                 playNotificationSound();
               }
             } else {
@@ -1640,7 +1642,19 @@ function AdminChatView({ chatId, onBack, pendingOrder, onClearPending }: { chatI
                          referrerPolicy="no-referrer"
                        />
                      )}
-                     {m.text && <p className="whitespace-pre-line leading-relaxed">{m.text}</p>}
+                     {m.text && (
+                       <div className="markdown-body">
+                         <Markdown 
+                           remarkPlugins={[remarkGfm]}
+                           components={{
+                             a: ({ ...props }) => <a {...props} className="text-current underline hover:opacity-80 break-all" target="_blank" rel="noopener noreferrer" />,
+                             p: ({ ...props }) => <p {...props} className="whitespace-pre-line leading-relaxed" />
+                           }}
+                         >
+                           {m.text}
+                         </Markdown>
+                       </div>
+                     )}
                      {m.senderId === 'system' && <div className="absolute top-0 right-0 p-1 opacity-20"><Zap className="w-10 h-10 sm:w-12 sm:h-12" /></div>}
                   </div>
                </div>
