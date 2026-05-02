@@ -1,6 +1,48 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ShoppingCart, X, Plus, Minus, ArrowRight, MessageSquare, ChevronLeft, CreditCard, Send, Zap, Menu } from 'lucide-react';
+import { 
+  ShoppingCart, 
+  X, 
+  Plus, 
+  Minus, 
+  ArrowRight, 
+  MessageSquare, 
+  ChevronLeft, 
+  CreditCard, 
+  Send, 
+  Zap, 
+  Menu, 
+  User, 
+  History, 
+  MapPin, 
+  LogOut, 
+  Search, 
+  ChevronDown,
+  ShieldCheck,
+  Star,
+  Play,
+  ShoppingBag,
+  Truck
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { initializeApp } from 'firebase/app';
+import { 
+  onAuthStateChanged, 
+  User as FirebaseUser,
+  signOut
+} from 'firebase/auth';
+import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, doc, setDoc, where, getDocs } from 'firebase/firestore';
+import { 
+  auth, 
+  db, 
+  signInWithGoogle, 
+  handleFirestoreError, 
+  OperationType,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  sendEmailVerification,
+  updateProfile,
+  updatePassword
+} from './lib/firebase';
 
 // --- TYPES ---
 type ProductVariant = {
@@ -30,6 +72,7 @@ type Product = {
   description: string;
   rating?: number;
   reviewsCount?: number;
+  isLastStock?: boolean;
   variations?: ProductVariant[];
   reviews?: Review[];
 };
@@ -41,12 +84,18 @@ type CartItem = {
   selectedVariant?: ProductVariant;
 };
 
-type ViewState = 'store' | 'product' | 'checkout' | 'chat_payment' | 'warehouse' | 'about';
+type ViewState = 'store' | 'product' | 'checkout' | 'chat_payment' | 'warehouse' | 'about' | 'admin' | 'admin_chat' | 'tracking' | 'dashboard' | 'auth';
 
 // --- UTILS ---
 const formatPHP = (amount: number) => {
   return `₱${amount.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
+
+const generateTrackingNumber = () => {
+  return `PCB-${Math.random().toString(36).substring(2, 9).toUpperCase()}`;
+};
+
+const DELIVERY_FEE = 150;
 
 // --- MOCK DATA ---
 const WAREHOUSE_IMAGES = [
@@ -58,6 +107,40 @@ const WAREHOUSE_IMAGES = [
 ];
 
 const PRODUCTS: Product[] = [
+  {
+    id: 'p6',
+    name: 'Samsung T7 Portable SSD',
+    price: 2990,
+    category: 'SSD',
+    subcategory: 'PORTABLE',
+    rating: 5.0,
+    reviewsCount: 10,
+    isLastStock: true,
+    description: 'Light, pocket-sized Portable SSD T7 delivers fast speeds with easy and reliable data storage for transferring large files. Transfer massive files within seconds with the incredible speed of USB 3.2 Gen 2. Shock-resistant aluminum casing provides rugged durability alongside its sleek, modern aesthetic. High performance for work and play.',
+    image: 'https://i.imgur.com/6ApxjHs.jpg',
+    variations: [
+      { id: 'v1', name: '1 Terabyte', price: 2990 },
+      { id: 'v2', name: '2 Terabyte', price: 3790 }
+    ],
+    reviews: [
+      {
+        id: 'r_t7_1',
+        author: 'Jonathan P',
+        date: '2026-04-28',
+        text: 'ito ang jackpot thanks Ng marami po',
+        images: ['https://img.lazcdn.com/g/ugc/abbc5083000d4ac79447abad47d44149_7c4d6ba43625481d8d29b7404bcb00b6.jpg_x700q80.jpg_.webp'],
+        helpfulCount: 12
+      },
+      {
+        id: 'r_t7_2',
+        author: 'Sarah K',
+        date: '2026-05-01',
+        text: 'legit super!!',
+        images: ['https://img.lazcdn.com/g/ugc/b7c468f2f8c9413ba0b03a25783d8bb2_2_1771408633.590912.jpg_x700q80.jpg_.webp'],
+        helpfulCount: 8
+      }
+    ]
+  },
   {
     id: 'p1',
     name: 'Viewpoint 34-Inch Frameless Monitor',
@@ -163,21 +246,6 @@ const PRODUCTS: Product[] = [
     image: 'https://i.imgur.com/2btT2co.jpg',
   },
   {
-    id: 'p6',
-    name: 'Samsung T7 Portable SSD',
-    price: 6499,
-    category: 'SSD',
-    subcategory: 'PORTABLE',
-    rating: 4.7,
-    reviewsCount: 8,
-    description: 'Light, pocket-sized Portable SSD T7 delivers fast speeds with easy and reliable data storage for transferring large files. Transfer massive files within seconds with the incredible speed of USB 3.2 Gen 2. Shock-resistant aluminum casing provides rugged durability alongside its sleek, modern aesthetic.',
-    image: 'https://i.imgur.com/6ApxjHs.jpg',
-    variations: [
-      { id: 'v1', name: '1 Terabyte', price: 6499 },
-      { id: 'v2', name: '2 Terabyte', price: 7499 }
-    ]
-  },
-  {
     id: 'p7',
     name: 'Portable SSD Rugged Storage',
     price: 1850,
@@ -215,12 +283,118 @@ export default function App() {
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [checkoutData, setCheckoutData] = useState({ name: '', email: '', phone: '', address: '' });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [showPopup, setShowPopup] = useState(false);
+  const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
+  const [userProfile, setUserProfile] = useState<any>(null);
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, async (currUser) => {
+      setUser(currUser);
+      if (currUser) {
+        // Updated admin check to include the requested credentials pattern
+        setIsAdmin(currUser.email === 'paoloesteban75@gmail.com' || currUser.email === 'akolangpo@pcbodega.com');
+        
+        // Fetch user profile from Firestore
+        const userDoc = await getDocs(query(collection(db, 'users'), where('__name__', '==', currUser.uid)));
+        if (!userDoc.empty) {
+          setUserProfile(userDoc.docs[0].data());
+          if (userDoc.docs[0].data().address && !checkoutData.address) {
+            setCheckoutData(prev => ({ ...prev, address: userDoc.docs[0].data().address, phone: userDoc.docs[0].data().phone || '' }));
+          }
+        }
+      } else {
+        setIsAdmin(false);
+        setUserProfile(null);
+      }
+    });
+
+    const timer = setTimeout(() => setShowPopup(true), 2000);
+
+    return () => {
+      unsub();
+      clearTimeout(timer);
+    };
+  }, []);
 
   useEffect(() => {
     if (isCartOpen) document.body.style.overflow = 'hidden';
     else document.body.style.overflow = 'unset';
     return () => { document.body.style.overflow = 'unset'; };
   }, [isCartOpen]);
+
+  const handleCheckout = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    let currentUser = user;
+
+    // Automatic registration if not logged in
+    if (!currentUser) {
+      try {
+        // Use a generated password for auto-registration since we don't ask for one at checkout
+        const autoPass = 'Customer123!'; 
+        const result = await createUserWithEmailAndPassword(auth, checkoutData.email, autoPass);
+        currentUser = result.user;
+        await updateProfile(currentUser, { displayName: checkoutData.name });
+        
+        // Save profile
+        await setDoc(doc(db, 'users', currentUser.uid), {
+          displayName: checkoutData.name,
+          email: checkoutData.email,
+          address: checkoutData.address,
+          phone: checkoutData.phone,
+          updatedAt: serverTimestamp()
+        });
+      } catch (err: any) {
+        // If user already exists, we continue with order as guest or ask them to login 
+        // For "automatic" flow, we'll try to just proceed if possible or handle error
+        console.error("Auto-registration error", err);
+      }
+    }
+
+    const trackingNumber = generateTrackingNumber();
+    const orderData = {
+      ...checkoutData,
+      userId: currentUser?.uid || null,
+      trackingNumber,
+      items: cart.map(item => ({
+        id: item.id,
+        name: item.product.name,
+        variant: item.selectedVariant?.name || null,
+        price: item.selectedVariant ? item.selectedVariant.price : item.product.price,
+        quantity: item.quantity
+      })),
+      total: cartSubtotal + DELIVERY_FEE,
+      status: 'pending',
+      createdAt: serverTimestamp()
+    };
+
+    try {
+      const path = 'orders';
+      await addDoc(collection(db, path), orderData);
+      
+      if (currentUser) {
+        const chatPath = `chats`;
+        const chatId = currentUser.uid;
+        await setDoc(doc(db, chatPath, chatId), {
+          userId: currentUser.uid,
+          userName: currentUser.displayName || checkoutData.name,
+          lastMessage: `New Order: ${trackingNumber} (${formatPHP(cartSubtotal + DELIVERY_FEE)})`,
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+
+        // Instant chat box appearance as requested
+        setSelectedChatId(currentUser.uid);
+        setView('admin_chat');
+      }
+
+      alert(`Order placed! Tracking ID: ${trackingNumber}. A support chat has been opened for you.`);
+      setCart([]);
+    } catch (err) {
+      handleFirestoreError(err, OperationType.WRITE, 'orders');
+    }
+  };
 
   const addToCart = (product: Product, variant?: ProductVariant) => {
     const itemPrice = variant ? variant.price : product.price;
@@ -271,6 +445,11 @@ export default function App() {
     setIsMobileMenuOpen(false);
   };
 
+  const loginRedirect = () => {
+    if (!user) setView('auth');
+    else setView('dashboard');
+  };
+
   return (
     <div className="flex flex-col min-h-screen text-slate-100 flex-1 w-full max-w-[100vw] overflow-x-hidden">
       {/* Top Banner */}
@@ -300,11 +479,26 @@ export default function App() {
 
         <nav className="hidden lg:flex gap-8 text-sm font-medium text-slate-400">
           <button onClick={() => navigateTo('store')} className={(view === 'store' || view === 'product') ? 'text-sky-400 font-bold' : 'hover:text-white transition-colors'}>Inventory</button>
+          <button onClick={() => navigateTo('tracking')} className={view === 'tracking' ? 'text-sky-400 font-bold' : 'hover:text-white transition-colors'}>Track Order</button>
           <button onClick={() => navigateTo('warehouse')} className={view === 'warehouse' ? 'text-sky-400 font-bold' : 'hover:text-white transition-colors'}>Our Warehouse</button>
           <button onClick={() => navigateTo('about')} className={view === 'about' ? 'text-sky-400 font-bold' : 'hover:text-white transition-colors'}>About Us</button>
+          {isAdmin && <button onClick={() => navigateTo('admin')} className={view === 'admin' ? 'text-orange-400 font-bold' : 'text-orange-500/70 hover:text-orange-400 transition-colors'}>Seller Dashboard</button>}
         </nav>
 
         <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 group cursor-pointer" onClick={loginRedirect}>
+            {user ? (
+              <>
+                <img src={user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName || user.email}&background=0ea5e9&color=fff`} alt="" className="w-8 h-8 rounded-full border border-white/10" />
+                <span className="text-[10px] font-bold text-slate-400 hidden sm:inline-block group-hover:text-white uppercase tracking-wider">{isAdmin ? 'Seller Mode' : 'Dashboard'}</span>
+              </>
+            ) : (
+              <div className="flex items-center gap-2 text-[10px] uppercase font-bold tracking-widest text-slate-400 hover:text-white transition-colors border border-white/10 px-4 py-2 rounded-xl">
+                 <User className="w-3.5 h-3.5" />
+                 <span>Login / Register</span>
+              </div>
+            )}
+          </div>
           <button
             onClick={() => setIsCartOpen(true)}
             className="relative p-2 text-slate-300 hover:text-white transition-colors hover:bg-white/5 rounded-full"
@@ -329,9 +523,12 @@ export default function App() {
             className="lg:hidden bg-bg-surface border-b border-white/10 overflow-hidden absolute w-full z-30 top-[104px]"
           >
              <div className="p-4 flex flex-col gap-4 text-sm font-medium">
+                {isAdmin && <button onClick={() => navigateTo('admin')} className="text-left py-2 text-orange-400 font-bold">Seller Dashboard</button>}
                 <button onClick={() => navigateTo('store')} className="text-left py-2 hover:text-sky-400">Inventory</button>
+                <button onClick={() => navigateTo('tracking')} className="text-left py-2 hover:text-sky-400">Track Order</button>
                 <button onClick={() => navigateTo('warehouse')} className="text-left py-2 hover:text-sky-400">Our Warehouse</button>
                 <button onClick={() => navigateTo('about')} className="text-left py-2 hover:text-sky-400">About Us</button>
+                <button onClick={loginRedirect} className="text-left py-2 text-slate-400 border-t border-white/5 pt-4">{user ? 'My Dashboard' : 'Login / Register'}</button>
              </div>
           </motion.div>
         )}
@@ -381,17 +578,58 @@ export default function App() {
                 subtotal={cartSubtotal} 
                 checkoutData={checkoutData}
                 setCheckoutData={setCheckoutData}
-                onProceed={(e) => { 
-                   e.preventDefault(); 
-                   window.open('https://tawk.to/pcbodega', '_blank', 'noopener,noreferrer');
-                   setCart([]);
-                   setView('store');
-                }} 
+                onProceed={handleCheckout} 
                 onBack={() => setView('store')} 
               />
             </motion.div>
           )}
+
+          {view === 'admin' && isAdmin && (
+            <motion.div key="admin" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex-1">
+               <AdminDashboard onOpenChat={(chatId) => { setSelectedChatId(chatId); setView('admin_chat'); }} />
+            </motion.div>
+          )}
+
+          {view === 'admin_chat' && isAdmin && selectedChatId && (
+             <motion.div key="admin_chat" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="flex-1">
+                <AdminChatView chatId={selectedChatId} onBack={() => setView('admin')} />
+             </motion.div>
+          )}
+
+          {view === 'auth' && (
+            <motion.div key="auth" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex-1">
+               <AuthView onAuthSuccess={() => setView('dashboard')} />
+            </motion.div>
+          )}
+
+          {view === 'dashboard' && user && (
+            <motion.div key="dashboard" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex-1">
+               <UserDashboardView user={user} profile={userProfile} onSignOut={() => { setView('store'); }} onNavigate={setView} />
+            </motion.div>
+          )}
+
+          {view === 'tracking' && (
+            <motion.div key="tracking" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex-1">
+               <TrackingView />
+            </motion.div>
+          )}
         </AnimatePresence>
+
+        <DeliveryPopup isOpen={showPopup} onClose={() => setShowPopup(false)} />
+
+        {/* Floating Chat Button for Users */}
+        {user && !isAdmin && (
+          <button 
+            onClick={() => {
+              setSelectedChatId(user.uid);
+              setView('admin_chat');
+            }}
+            className="fixed bottom-6 right-6 w-14 h-14 bg-sky-500 text-black rounded-full shadow-2xl flex items-center justify-center hover:scale-110 transition-all z-40 group"
+          >
+             <MessageSquare className="w-6 h-6" />
+             <span className="absolute right-full mr-4 bg-bg-surface border border-white/10 px-3 py-1.5 rounded-lg text-xs font-bold text-white whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">Chat with Seller</span>
+          </button>
+        )}
       </main>
 
       {/* Footer */}
@@ -619,6 +857,12 @@ function Storefront({ products, onProductClick, onAddToCart, activeCategory, set
                 
                 <div className="flex flex-col flex-1">
                   <h3 className="font-medium text-[15px] mb-1 leading-tight group-hover:text-sky-400 transition-colors">{product.name}</h3>
+                  {product.isLastStock && (
+                    <div className="flex items-center gap-1.5 mb-2 bg-red-500/10 border border-red-500/20 px-2 py-0.5 rounded w-fit">
+                       <Zap className="w-3 h-3 text-red-500 fill-red-500" />
+                       <span className="text-[10px] font-bold text-red-500 uppercase tracking-tighter">Last Stock Left</span>
+                    </div>
+                  )}
                   <div className="flex items-center gap-1 mb-2">
                       <div className="flex text-yellow-400 text-xs">
                           {product.rating ? ('★'.repeat(Math.round(product.rating)) + '☆'.repeat(5 - Math.round(product.rating))) : '★★★★★'}
@@ -678,6 +922,12 @@ function ProductView({ product, onAddToCart, onBack }: { product: Product, onAdd
                  <span className="text-sky-500 text-xs font-bold uppercase tracking-widest">{product.category} {product.subcategory && `> ${product.subcategory}`}</span>
                </div>
                <h1 className="text-3xl sm:text-4xl font-bold tracking-tight mb-2">{product.name}</h1>
+               {product.isLastStock && (
+                 <div className="flex items-center gap-2 mb-4 bg-red-500/10 border border-red-500/20 px-3 py-1.5 rounded-lg w-fit animate-pulse">
+                    <Zap className="w-4 h-4 text-red-500 fill-red-500" />
+                    <span className="text-xs font-bold text-red-500 uppercase tracking-widest">Hurry! Last inventory items remaining</span>
+                 </div>
+               )}
                <div className="flex items-center gap-2 mb-6">
                    <div className="flex text-yellow-400 text-sm">
                        {product.rating ? ('★'.repeat(Math.round(product.rating)) + '☆'.repeat(5 - Math.round(product.rating))) : '★★★★★'}
@@ -803,7 +1053,646 @@ function WarehouseView() {
   );
 }
 
-// 1.6 About Us View Component
+// --- MODALS & DASHBOARD ---
+
+function DeliveryPopup({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) {
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <motion.div 
+            initial={{ opacity: 0 }} 
+            animate={{ opacity: 1 }} 
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+            className="absolute inset-0 bg-black/80 backdrop-blur-md"
+          />
+          <motion.div 
+            initial={{ scale: 0.9, opacity: 0, y: 20 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0.9, opacity: 0, y: 20 }}
+            className="relative bg-[#111318] border border-sky-500/30 rounded-3xl overflow-hidden shadow-[0_0_80px_rgba(14,165,233,0.2)] max-w-lg w-full"
+          >
+            <div className="p-1">
+               <div className="bg-sky-500 py-3 text-center">
+                  <span className="text-black font-black text-sm uppercase tracking-[0.2em] italic">Ultimate Hardware Sale</span>
+               </div>
+            </div>
+            
+            <div className="p-8 md:p-12 text-center flex flex-col items-center">
+                <div className="w-20 h-20 bg-sky-500/10 rounded-full flex items-center justify-center mb-6 border border-sky-500/20">
+                  <span className="text-sky-400 font-black text-2xl animate-pulse">70%</span>
+               </div>
+               
+               <h3 className="text-3xl md:text-4xl font-bold tracking-tight mb-4 uppercase">
+                  BIG DEAL <br />
+                  <span className="text-sky-500 italic">SAMSUNG T7</span>
+               </h3>
+               
+               <p className="text-slate-400 text-sm leading-relaxed mb-8 max-w-sm">
+                  Get the Samsung T7 Portable SSD at a massive <span className="text-sky-400 font-bold">70% OFF</span> today! Exclusive warehouse retail price for limited units only.
+               </p>
+               
+               <button 
+                  onClick={onClose}
+                  className="w-full bg-white text-black font-black py-4 rounded-xl uppercase tracking-widest hover:bg-sky-400 transition-colors"
+               >
+                  Shop Now
+               </button>
+            </div>
+            
+            <button 
+               onClick={onClose}
+               className="absolute top-4 right-4 text-slate-500 hover:text-white"
+            >
+               <X className="w-5 h-5" />
+            </button>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+function AdminDashboard({ onOpenChat }: { onOpenChat: (id: string) => void }) {
+  const [orders, setOrders] = useState<any[]>([]);
+  const [chats, setChats] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState<'orders' | 'messages'>('orders');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const qOrders = query(collection(db, 'orders'), orderBy('createdAt', 'desc'));
+    const unsubOrders = onSnapshot(qOrders, (snapshot) => {
+      setOrders(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+
+    const qChats = query(collection(db, 'chats'), orderBy('updatedAt', 'desc'));
+    const unsubChats = onSnapshot(qChats, (snapshot) => {
+      setChats(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setLoading(false);
+    }, (err) => {
+      console.error(err);
+      setLoading(false);
+    });
+
+    return () => {
+      unsubOrders();
+      unsubChats();
+    };
+  }, []);
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+       <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-8 gap-4">
+          <div>
+             <h1 className="text-4xl font-bold tracking-tight uppercase mb-2">Seller <span className="text-orange-500 italic">Dashboard</span></h1>
+             <p className="text-slate-500 text-sm">Managing retail inventory and customer requests from Firestore.</p>
+          </div>
+          <div className="flex bg-white/5 p-1 rounded-xl border border-white/5">
+             <button 
+               onClick={() => setActiveTab('orders')}
+               className={`px-6 py-2 rounded-lg text-xs font-bold transition-all uppercase tracking-widest ${activeTab === 'orders' ? 'bg-sky-500 text-black' : 'text-slate-400 hover:text-white'}`}
+             >
+                Orders
+             </button>
+             <button 
+               onClick={() => setActiveTab('messages')}
+               className={`px-6 py-2 rounded-lg text-xs font-bold transition-all uppercase tracking-widest ${activeTab === 'messages' ? 'bg-orange-500 text-black' : 'text-slate-400 hover:text-white'}`}
+             >
+                Messages {chats.length > 0 && <span className="ml-2 bg-black/20 px-1.5 rounded-full">{chats.length}</span>}
+             </button>
+          </div>
+       </div>
+
+       <div className="grid grid-cols-1 gap-6">
+          {loading ? (
+             <div className="text-center py-20 text-slate-500 italic">Connecting to secure database...</div>
+          ) : activeTab === 'orders' ? (
+             orders.length === 0 ? (
+                <div className="text-center py-20 bg-bg-card border border-white/5 rounded-3xl">
+                   <p className="text-slate-500 font-medium">No orders recorded in the cloud yet.</p>
+                </div>
+             ) : (
+                orders.map((order) => (
+                  <motion.div 
+                    key={order.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="bg-bg-card border border-white/5 rounded-2xl overflow-hidden hover:border-white/10 transition-colors shadow-xl"
+                  >
+                     <div className="p-6 border-b border-white/5 flex flex-col md:flex-row justify-between gap-4">
+                        <div>
+                           <div className="flex items-center gap-3 mb-2">
+                              <h3 className="text-lg font-bold">{order.name}</h3>
+                              <span className="text-[10px] bg-orange-500/20 text-orange-400 px-2 py-0.5 rounded font-bold uppercase tracking-tighter border border-orange-500/20">{order.status}</span>
+                           </div>
+                           <div className="flex flex-col gap-1 text-xs text-slate-400">
+                              <span className="flex items-center gap-2 lowercase text-sky-400"><span className="uppercase text-slate-600 font-bold">Email:</span> {order.email}</span>
+                              <span className="flex items-center gap-2"><span className="uppercase text-slate-600 font-bold">Phone:</span> {order.phone}</span>
+                              <span className="flex items-center gap-2"><span className="uppercase text-slate-600 font-bold">Address:</span> {order.address}</span>
+                           </div>
+                        </div>
+                        <div className="text-right flex flex-col justify-between items-end">
+                           <span className="text-xs text-slate-600 font-mono italic">#{order.id.slice(-6).toUpperCase()}</span>
+                           <div className="text-2xl font-mono font-bold text-sky-400">{formatPHP(order.total)}</div>
+                        </div>
+                     </div>
+                     <div className="p-6 bg-black/20">
+                        <div className="text-[10px] text-slate-600 uppercase font-bold tracking-widest mb-4">Line Items</div>
+                        <div className="space-y-3">
+                           {order.items?.map((item: any, idx: number) => (
+                              <div key={idx} className="flex justify-between items-center text-sm">
+                                 <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 rounded bg-white/5 flex items-center justify-center text-[10px] font-bold text-slate-500">{item.quantity}x</div>
+                                    <span className="text-slate-300">{item.name} {item.variant && <span className="text-sky-500/70 text-xs ml-1">({item.variant})</span>}</span>
+                                 </div>
+                                 <span className="font-mono text-slate-500">{formatPHP(item.price * item.quantity)}</span>
+                              </div>
+                           ))}
+                        </div>
+                     </div>
+                     <div className="px-6 py-4 border-t border-white/5 flex justify-between items-center">
+                        <span className="text-[10px] text-slate-700 italic">Ordered on {order.createdAt?.toDate?.()?.toLocaleString() || 'Process pending...'}</span>
+                        <div className="flex gap-4">
+                           {order.email && (
+                              <button onClick={() => {
+                                 const c = chats.find(ch => ch.id === order.userId || ch.userName === order.name);
+                                 if (c) onOpenChat(c.id);
+                              }} className="text-xs font-bold text-slate-400 hover:text-white uppercase tracking-widest transition-colors flex items-center gap-2">
+                                 Message User <MessageSquare className="w-3 h-3" />
+                              </button>
+                           )}
+                           <button className="text-xs font-bold text-sky-500 hover:text-white uppercase tracking-widest transition-colors flex items-center gap-2">
+                              Update Status <ArrowRight className="w-3 h-3" />
+                           </button>
+                        </div>
+                     </div>
+                  </motion.div>
+                ))
+             )
+          ) : (
+             chats.length === 0 ? (
+                <div className="text-center py-20 bg-bg-card border border-white/5 rounded-3xl">
+                   <p className="text-slate-500 font-medium">No customer inquiries yet.</p>
+                </div>
+             ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                   {chats.map(chat => (
+                      <div key={chat.id} onClick={() => onOpenChat(chat.id)} className="bg-bg-card border border-white/5 p-6 rounded-2xl cursor-pointer hover:border-orange-500/50 transition-all group shadow-lg">
+                         <div className="flex justify-between items-start mb-4">
+                            <div className="flex items-center gap-3">
+                               <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center font-bold text-slate-300">
+                                  {chat.userName?.charAt(0) || 'C'}
+                               </div>
+                               <div>
+                                  <h4 className="font-bold text-sm tracking-tight group-hover:text-orange-400 transition-colors">{chat.userName}</h4>
+                                  <p className="text-[10px] text-slate-500 font-mono tracking-tighter italic">ID: {chat.id}</p>
+                               </div>
+                            </div>
+                            <span className="text-[10px] text-slate-600 font-mono italic">{chat.updatedAt?.toDate?.()?.toLocaleTimeString()}</span>
+                         </div>
+                         <p className="text-xs text-slate-400 line-clamp-1 italic mb-4">"{chat.lastMessage}"</p>
+                         <button className="w-full py-2 bg-white/5 rounded-lg text-[10px] font-bold uppercase tracking-[0.2em] group-hover:bg-orange-500 transition-all group-hover:text-black">Open Conversation</button>
+                      </div>
+                   ))}
+                </div>
+             )
+          )}
+       </div>
+    </div>
+  );
+}
+function AdminChatView({ chatId, onBack }: { chatId: string, onBack: () => void }) {
+  const [messages, setMessages] = useState<any[]>([]);
+  const [inputText, setInputText] = useState('');
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const q = query(collection(db, 'chats', chatId, 'messages'), orderBy('createdAt', 'asc'));
+    const unsub = onSnapshot(q, (snapshot) => {
+      setMessages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    return unsub;
+  }, [chatId]);
+
+  useEffect(() => {
+    scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  const sendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inputText.trim() || !auth.currentUser) return;
+
+    const text = inputText;
+    setInputText('');
+
+    try {
+      await addDoc(collection(db, 'chats', chatId, 'messages'), {
+        text,
+        senderId: auth.currentUser.uid,
+        createdAt: serverTimestamp()
+      });
+      
+      await setDoc(doc(db, 'chats', chatId), {
+        lastMessage: text,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  return (
+    <div className="max-w-4xl mx-auto px-4 py-8 flex flex-col h-[calc(100vh-120px)]">
+       <button onClick={onBack} className="flex items-center gap-2 text-slate-400 hover:text-white mb-6 text-sm"><ChevronLeft className="w-4 h-4" /> Back to Dashboard</button>
+       <div className="flex-1 bg-bg-card border border-white/10 rounded-3xl overflow-hidden flex flex-col shadow-2xl">
+          <div className="p-4 bg-black/40 border-b border-white/5 flex items-center justify-between">
+             <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-sky-500/20 flex items-center justify-center font-bold text-sky-400">?</div>
+                <span className="font-bold text-sm">Customer Support Chat</span>
+             </div>
+             <span className="text-[10px] text-slate-500 uppercase font-bold px-2 py-1 bg-white/5 rounded">Live Thread</span>
+          </div>
+          <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
+             {messages.map((m) => (
+               <div key={m.id} className={`flex ${m.senderId === auth.currentUser?.uid ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`max-w-[80%] p-4 rounded-2xl text-sm ${m.senderId === auth.currentUser?.uid ? 'bg-sky-500 text-black font-medium' : 'bg-white/5 text-slate-300 border border-white/5'}`}>
+                     {m.text}
+                  </div>
+               </div>
+             ))}
+             <div ref={scrollRef} />
+          </div>
+          <form onSubmit={sendMessage} className="p-4 bg-black/40 border-t border-white/5 flex gap-2">
+             <input 
+               type="text" 
+               value={inputText}
+               onChange={(e) => setInputText(e.target.value)}
+               placeholder="Type a message to customer..." 
+               className="flex-1 bg-bg-surface border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-sky-500"
+             />
+             <button type="submit" className="p-3 bg-sky-500 text-black rounded-xl hover:bg-sky-400 transition-colors">
+                <Send className="w-5 h-5" />
+             </button>
+          </form>
+       </div>
+    </div>
+  );
+}
+
+// --- NEW COMPONENTS ---
+
+function AuthView({ onAuthSuccess }: { onAuthSuccess: () => void }) {
+  const [isLogin, setIsLogin] = useState(true);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    let loginEmail = email;
+    // Handle admin username mapping
+    if (email.toLowerCase() === 'akolangpo') {
+      loginEmail = 'akolangpo@pcbodega.com';
+    }
+
+    try {
+      if (isLogin) {
+        await signInWithEmailAndPassword(auth, loginEmail, password);
+      } else {
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        await updateProfile(userCredential.user, { displayName: name });
+        // Removed email verification requirement as requested
+        
+        // Initial profile creation
+        await setDoc(doc(db, 'users', userCredential.user.uid), {
+          displayName: name,
+          email: email,
+          address: '',
+          phone: '',
+          updatedAt: serverTimestamp()
+        });
+      }
+      onAuthSuccess();
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="max-w-md mx-auto px-4 py-20 flex flex-col items-center">
+       <div className="w-16 h-16 bg-sky-500 rounded-2xl flex items-center justify-center mb-8 italic font-black text-black text-2xl shadow-xl shadow-sky-500/20">PB</div>
+       <h2 className="text-3xl font-bold tracking-tighter uppercase mb-2">{isLogin ? 'Welcome Back' : 'Join PC Bodega'}</h2>
+       <p className="text-slate-500 text-sm mb-8 text-center">Manage your hardware orders and track delivery in real-time.</p>
+       
+       <form onSubmit={handleSubmit} className="w-full space-y-4">
+          {!isLogin && (
+            <div className="space-y-1.5">
+               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">Full Name</label>
+               <input required type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full bg-bg-card border border-white/5 rounded-xl px-4 py-3.5 focus:border-sky-500 outline-none transition-all" placeholder="John Doe" />
+            </div>
+          )}
+          <div className="space-y-1.5">
+             <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">Email Address</label>
+             <input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-bg-card border border-white/5 rounded-xl px-4 py-3.5 focus:border-sky-500 outline-none transition-all" placeholder="name@example.com" />
+          </div>
+          <div className="space-y-1.5">
+             <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">Password</label>
+             <input required type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-bg-card border border-white/5 rounded-xl px-4 py-3.5 focus:border-sky-500 outline-none transition-all" placeholder="••••••••" />
+          </div>
+
+          {error && <p className="text-xs text-red-500 bg-red-500/10 border border-red-500/20 p-3 rounded-lg">{error}</p>}
+
+          <button disabled={loading} type="submit" className="w-full bg-sky-500 hover:bg-sky-400 disabled:opacity-50 text-black font-black py-4 rounded-xl uppercase tracking-widest transition-all shadow-lg shadow-sky-500/20">
+             {loading ? 'Processing...' : (isLogin ? 'Login to Account' : 'Create Account')}
+          </button>
+       </form>
+
+       <button onClick={() => setIsLogin(!isLogin)} className="mt-8 text-xs text-slate-500 hover:text-sky-400 transition-colors uppercase tracking-[0.15em] font-bold">
+          {isLogin ? "Don't have an account? Sign Up" : "Already have an account? Log In"}
+       </button>
+       
+       <div className="w-full my-8 flex items-center gap-4">
+          <div className="flex-1 h-px bg-white/5"></div>
+          <span className="text-[10px] text-slate-600 font-bold uppercase">Or Continue with</span>
+          <div className="flex-1 h-px bg-white/5"></div>
+       </div>
+
+       <button onClick={signInWithGoogle} className="w-full bg-white/5 border border-white/10 hover:bg-white/10 text-white font-bold py-3.5 rounded-xl flex items-center justify-center gap-3 transition-all">
+          <img src="https://www.google.com/favicon.ico" className="w-4 h-4" alt="" />
+          <span className="text-sm">Google Account</span>
+       </button>
+    </div>
+  );
+}
+
+function UserDashboardView({ user, profile, onSignOut, onNavigate }: { user: FirebaseUser, profile: any, onSignOut: () => void, onNavigate: (v: ViewState) => void }) {
+  const [activeTab, setActiveTab] = useState<'profile' | 'orders' | 'chat'>('orders');
+  const [orders, setOrders] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const q = query(collection(db, 'orders'), where('userId', '==', user.uid), orderBy('createdAt', 'desc'));
+    const unsub = onSnapshot(q, (snapshot) => {
+      setOrders(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setLoading(false);
+    });
+    return unsub;
+  }, [user.uid]);
+
+  const handleSignOut = async () => {
+    await signOut(auth);
+    onSignOut();
+  };
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+          {/* Sidebar */}
+          <div className="lg:col-span-1 space-y-4">
+             <div className="bg-bg-card border border-white/5 rounded-3xl p-6 mb-8 text-center">
+                <div className="w-20 h-20 mx-auto rounded-full border-4 border-sky-500/20 p-1 mb-4">
+                   <img src={user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName || user.email}&background=0ea5e9&color=fff`} className="w-full h-full rounded-full object-cover" />
+                </div>
+                <h3 className="font-bold text-lg leading-tight mb-1">{profile?.displayName || user.displayName || 'Hardware Enthusiast'}</h3>
+                <p className="text-[10px] text-sky-500 font-bold uppercase tracking-widest">{user.emailVerified ? 'Verified Account' : 'Unverified Email'}</p>
+                {!user.emailVerified && (
+                  <button onClick={() => sendEmailVerification(user)} className="mt-2 text-[10px] text-slate-500 hover:text-sky-400">Resend Verification</button>
+                )}
+             </div>
+
+             <div className="bg-bg-card border border-white/5 rounded-3xl overflow-hidden p-2 space-y-1">
+                <button onClick={() => setActiveTab('orders')} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl text-xs font-bold transition-all ${activeTab === 'orders' ? 'bg-sky-500 text-black' : 'hover:bg-white/5 text-slate-400'}`}>
+                   <History className="w-4 h-4" /> My Orders
+                </button>
+                <button onClick={() => setActiveTab('profile')} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl text-xs font-bold transition-all ${activeTab === 'profile' ? 'bg-sky-500 text-black' : 'hover:bg-white/5 text-slate-400'}`}>
+                   <User className="w-4 h-4" /> My Profile
+                </button>
+                <button onClick={() => setActiveTab('chat')} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl text-xs font-bold transition-all ${activeTab === 'chat' ? 'bg-sky-500 text-black' : 'hover:bg-white/5 text-slate-400'}`}>
+                   <MessageSquare className="w-4 h-4" /> Live Support
+                </button>
+                <button onClick={() => onNavigate('tracking')} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl text-xs font-bold transition-all hover:bg-white/5 text-slate-400`}>
+                   <Search className="w-4 h-4" /> Track Order
+                </button>
+                <button onClick={handleSignOut} className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl text-xs font-bold text-red-500 hover:bg-red-500/10 transition-all border-t border-white/5 mt-4">
+                   <LogOut className="w-4 h-4" /> Sign Out
+                </button>
+             </div>
+          </div>
+
+          {/* Main View */}
+          <div className="lg:col-span-3">
+             {activeTab === 'orders' && (
+                <div className="space-y-6">
+                   <h2 className="text-2xl font-bold tracking-tighter uppercase mb-6 flex items-center gap-3">
+                      <History className="text-sky-500" /> Order <span className="text-sky-500 italic">History</span>
+                   </h2>
+                   {loading ? (
+                      <div className="text-center py-20 text-slate-500 italic">Loading your orders...</div>
+                   ) : orders.length === 0 ? (
+                      <div className="bg-bg-card border border-white/5 rounded-3xl p-12 text-center text-slate-500">
+                         <ShoppingBag className="w-12 h-12 mx-auto mb-4 opacity-10" />
+                         <p>You haven't placed any orders yet.</p>
+                      </div>
+                   ) : (
+                      <div className="space-y-4">
+                        {orders.map(order => (
+                           <div key={order.id} className="bg-bg-card border border-white/5 rounded-2xl overflow-hidden hover:border-white/10 transition-colors">
+                              <div className="p-6 flex flex-col md:flex-row justify-between gap-4">
+                                 <div>
+                                    <div className="flex items-center gap-3 mb-2">
+                                       <span className="text-xs font-mono font-bold text-slate-500">#{order.trackingNumber || 'PENDING'}</span>
+                                       <span className="text-[10px] bg-sky-500/20 text-sky-400 px-2 py-0.5 rounded font-bold uppercase">{order.status}</span>
+                                    </div>
+                                    <p className="text-xs text-slate-400">Total: {formatPHP(order.total)} • Placed on {order.createdAt?.toDate?.()?.toLocaleDateString()}</p>
+                                 </div>
+                                 <button onClick={() => { setActiveTab('chat') }} className="text-xs font-bold text-sky-400 hover:text-white uppercase tracking-widest py-2 px-4 border border-sky-400/20 rounded-lg hover:border-sky-400 transition-all flex items-center gap-2">
+                                    Track Delivery <MapPin className="w-3.5 h-3.5" />
+                                 </button>
+                              </div>
+                           </div>
+                        ))}
+                      </div>
+                   )}
+                </div>
+             )}
+
+             {activeTab === 'profile' && (
+                <div className="space-y-8">
+                   <h2 className="text-2xl font-bold tracking-tighter uppercase mb-6 flex items-center gap-3">
+                      <User className="text-sky-500" /> User <span className="text-sky-500 italic">Settings</span>
+                   </h2>
+                   <ProfileChangeForm user={user} profile={profile} />
+                </div>
+             )}
+
+             {activeTab === 'chat' && (
+                <div className="h-[600px] flex flex-col bg-bg-card border border-white/5 rounded-3xl overflow-hidden shadow-2xl">
+                   <div className="p-4 border-b border-white/5 bg-black/20 flex justify-between items-center">
+                      <div className="flex items-center gap-3">
+                         <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                         <span className="text-sm font-bold uppercase tracking-widest text-slate-300">Live Support Thread</span>
+                      </div>
+                      <span className="text-[10px] text-slate-500 font-mono italic">Connected to PC Bodega Admin</span>
+                   </div>
+                   <div className="flex-1 overflow-hidden p-0">
+                      <AdminChatView chatId={user.uid} onBack={() => {}} />
+                   </div>
+                </div>
+             )}
+          </div>
+       </div>
+    </div>
+  );
+}
+
+function ProfileChangeForm({ user, profile }: { user: FirebaseUser, profile: any }) {
+  const [name, setName] = useState(profile?.displayName || user.displayName || '');
+  const [address, setAddress] = useState(profile?.address || '');
+  const [phone, setPhone] = useState(profile?.phone || '');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      if (name !== user.displayName) {
+        await updateProfile(user, { displayName: name });
+      }
+      if (password) {
+        await updatePassword(user, password);
+      }
+      
+      await setDoc(doc(db, 'users', user.uid), {
+        displayName: name,
+        address,
+        phone,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+      
+      alert("Settings saved successfully!");
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleUpdate} className="bg-bg-card border border-white/5 rounded-3xl p-8 space-y-6 max-w-2xl">
+       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-1.5">
+             <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Full Name</label>
+             <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full bg-bg-surface border border-white/5 rounded-xl px-4 py-3 outline-none focus:border-sky-500 text-sm" />
+          </div>
+          <div className="space-y-1.5">
+             <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Phone Number</label>
+             <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full bg-bg-surface border border-white/5 rounded-xl px-4 py-3 outline-none focus:border-sky-500 text-sm" />
+          </div>
+       </div>
+       <div className="space-y-1.5">
+          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Delivery Address</label>
+          <textarea rows={3} value={address} onChange={(e) => setAddress(e.target.value)} className="w-full bg-bg-surface border border-white/5 rounded-xl px-4 py-3 outline-none focus:border-sky-500 text-sm resize-none" />
+       </div>
+       <div className="space-y-1.5">
+          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">New Password (Leave blank to keep current)</label>
+          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-bg-surface border border-white/5 rounded-xl px-4 py-3 outline-none focus:border-sky-500 text-sm" placeholder="••••••••" />
+       </div>
+       <button disabled={loading} type="submit" className="bg-sky-500 hover:bg-sky-400 text-black font-black py-4 px-12 rounded-xl uppercase tracking-widest transition-all">
+          {loading ? 'Saving...' : 'Save Settings'}
+       </button>
+    </form>
+  );
+}
+
+function TrackingView() {
+  const [tn, setTn] = useState('');
+  const [result, setResult] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!tn.trim()) return;
+    setLoading(true);
+    
+    // As per user request: "any number generated... status must be will be delivered the next day during office hours"
+    setTimeout(() => {
+      setResult({
+        status: 'Processing (On the way)',
+        text: 'Your order will be delivered the next day during office hours.',
+        number: tn.toUpperCase()
+      });
+      setLoading(false);
+    }, 1000);
+  };
+
+  return (
+    <div className="max-w-4xl mx-auto px-4 py-20 flex flex-col items-center">
+       <h1 className="text-4xl font-black uppercase tracking-tight mb-4 text-center">Track Your <span className="text-sky-500 italic">Package</span></h1>
+       <p className="text-slate-500 mb-12 text-center max-w-lg">Enter your PC Bodega tracking number to check real-time delivery status and rider location.</p>
+       
+       <form onSubmit={handleSearch} className="w-full max-w-xl flex gap-3 mb-12">
+          <input 
+            type="text" 
+            value={tn} 
+            onChange={(e) => setTn(e.target.value)}
+            placeholder="PCB-XXXX-XXXX" 
+            className="flex-1 bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-lg font-mono outline-none focus:border-sky-500 transition-all text-sky-400 placeholder:text-slate-700"
+          />
+          <button type="submit" className="bg-sky-500 hover:bg-sky-400 text-black px-8 rounded-2xl transition-all">
+             <Search className="w-6 h-6" />
+          </button>
+       </form>
+
+       {loading && <div className="animate-pulse text-sky-500 font-bold uppercase tracking-widest">Searching our cloud database...</div>}
+
+       {result && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full bg-bg-card border border-white/5 rounded-3xl p-8 mb-12 shadow-2xl relative overflow-hidden">
+             <div className="absolute top-0 right-0 p-4 opacity-5">
+                <Truck className="w-32 h-32" />
+             </div>
+             <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 bg-green-500/20 rounded-full flex items-center justify-center">
+                   <Zap className="w-5 h-5 text-green-500" />
+                </div>
+                <div>
+                   <h3 className="text-xl font-bold tracking-tighter uppercase">{result.status}</h3>
+                   <p className="text-[10px] text-slate-500 uppercase tracking-widest font-mono">Tracking: {result.number}</p>
+                </div>
+             </div>
+             <p className="text-lg text-slate-300 leading-relaxed font-medium mb-4 italic">"{result.text}"</p>
+             <div className="flex gap-2">
+                <span className="text-[10px] bg-sky-500/10 text-sky-400 py-1 px-3 rounded-full font-bold uppercase tracking-widest">Same Day Dispatch</span>
+                <span className="text-[10px] bg-white/5 text-slate-500 py-1 px-3 rounded-full font-bold uppercase tracking-widest">Metro Manila Priority</span>
+             </div>
+          </motion.div>
+       )}
+
+       <div className="w-full rounded-3xl overflow-hidden border border-white/10 bg-black/40 h-[400px] shadow-2xl">
+          {/* User provided link: https://maps.app.goo.gl/Cncx8rtiiKQYqVDe7 */}
+          <iframe 
+            src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3861.1278153434676!2d121.0425268!3d14.5912836!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3397c83f124c9c7f%3A0xe54e6015dd394d1f!2sCyberzone%20SM%20Megamall!5e0!3m2!1sen!2sph!4v1714652000000!5m2!1sen!2sph"
+            width="100%" 
+            height="100%" 
+            style={{ border: 0 }} 
+            allowFullScreen 
+            loading="lazy" 
+            referrerPolicy="no-referrer-when-downgrade"
+          />
+       </div>
+       <p className="mt-4 text-[10px] text-slate-600 uppercase font-black tracking-widest">Live Rider Tracking Enabled • SM Megamall Central Hub</p>
+    </div>
+  );
+}
+
 function AboutView({ onNavigate }: { onNavigate: (view: ViewState) => void }) {
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-20 text-center">
@@ -821,7 +1710,7 @@ function AboutView({ onNavigate }: { onNavigate: (view: ViewState) => void }) {
 // 2. Checkout View Component
 function CheckoutView({ cart, subtotal, checkoutData, setCheckoutData, onProceed, onBack }: any) {
   const tax = subtotal * 0.08;
-  const total = subtotal + tax;
+  const total = subtotal + DELIVERY_FEE;
 
   if (cart.length === 0) {
     return (
@@ -885,11 +1774,11 @@ function CheckoutView({ cart, subtotal, checkoutData, setCheckoutData, onProceed
            <div className="bg-bg-surface border border-white/10 rounded-2xl p-8 sticky top-24 shadow-2xl">
               <h3 className="text-lg font-bold uppercase mb-6 flex items-center gap-2 tracking-wider">Order Summary</h3>
               <div className="space-y-3 mb-6 text-sm text-slate-300">
-                 <div className="flex justify-between"><span className="text-slate-400">Subtotal</span><span className="font-mono text-white">{formatPHP(subtotal)}</span></div>
-                 <div className="flex justify-between"><span className="text-slate-400">Estimated Tax</span><span className="font-mono text-white">{formatPHP(tax)}</span></div>
+                 <div className="flex justify-between"><span className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Subtotal Inventory</span><span className="font-mono text-white">{formatPHP(subtotal)}</span></div>
+                 <div className="flex justify-between border-t border-white/5 pt-3"><span className="text-slate-500 italic">Delivery Fee (Flat Rate)</span><span className="font-mono text-slate-400">{formatPHP(DELIVERY_FEE)}</span></div>
               </div>
               <div className="border-t border-white/10 pt-5 mb-8 flex justify-between items-end">
-                 <span className="text-base font-medium text-slate-400 uppercase">Total</span>
+                 <span className="text-base font-medium text-slate-400 uppercase">Grand Total</span>
                  <span className="text-3xl font-mono font-bold text-sky-400">{formatPHP(total)}</span>
               </div>
               <button type="submit" form="checkout-form" className="w-full bg-sky-500 hover:bg-sky-400 text-black font-extrabold py-4 rounded-lg uppercase tracking-tighter flex items-center justify-center gap-2 transition-all shadow-lg shadow-sky-500/20">Proceed to Payment <ArrowRight className="w-5 h-5 ml-1" /></button>

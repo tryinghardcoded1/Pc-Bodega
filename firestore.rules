@@ -1,0 +1,91 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helpers ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        request.auth.token.email == 'paoloesteban75@gmail.com'
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- Validation Functions ---
+    function isValidOrder(data) {
+      return data.keys().hasAll(['name', 'email', 'phone', 'address', 'items', 'total', 'status', 'createdAt', 'trackingNumber']) &&
+             data.keys().size() >= 9 &&
+             data.name is string &&
+             data.email is string &&
+             data.trackingNumber is string &&
+             data.status in ['pending', 'processing', 'shipped', 'delivered'] &&
+             data.createdAt == request.time;
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['displayName', 'address', 'phone', 'updatedAt']) &&
+             data.displayName is string &&
+             data.updatedAt == request.time;
+    }
+
+    // --- Collection Rules ---
+
+    // Users Collection
+    match /users/{userId} {
+      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow write: if isSignedIn() && request.auth.uid == userId && isValidUser(incoming());
+    }
+
+    // Admins Collection
+    match /admins/{adminId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // Orders Collection
+    match /orders/{orderId} {
+      allow create: if isValidId(orderId) && isValidOrder(incoming());
+      // Allow read if user owns the order OR if searching by tracking number (handled via query restrictions)
+      allow read: if isAdmin() || (isSignedIn() && (resource == null || resource.data.userId == request.auth.uid)) || (resource != null && resource.data.trackingNumber != null);
+      allow update, delete: if isAdmin();
+    }
+
+    // Chat Threads
+    match /chats/{chatId} {
+      // Users can see and create their own chat thread
+      // Admins can see all threads
+      allow create: if isValidId(chatId) && (incoming().userId == request.auth.uid || isAdmin()) && isValidChatThread(incoming());
+      allow read: if isAdmin() || (isSignedIn() && existing().userId == request.auth.uid);
+      allow update: if (isAdmin() || (isSignedIn() && existing().userId == request.auth.uid)) && isValidChatThread(incoming());
+    }
+
+    // Chat Messages
+    match /chats/{chatId}/messages/{messageId} {
+      // Same logic as thread access
+      allow create: if isValidId(messageId) && isValidMessage(incoming()) && (
+        isAdmin() || (isSignedIn() && get(/databases/$(database)/documents/chats/$(chatId)).data.userId == request.auth.uid)
+      );
+      allow read: if isAdmin() || (isSignedIn() && get(/databases/$(database)/documents/chats/$(chatId)).data.userId == request.auth.uid);
+    }
+  }
+}

@@ -1,0 +1,58 @@
+{
+  "entities": {
+    "Order": {
+      "title": "Order",
+      "description": "Represents a customer order from the store.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Customer name" },
+        "email": { "type": "string", "description": "Customer email" },
+        "phone": { "type": "string", "description": "Customer phone number" },
+        "address": { "type": "string", "description": "Customer delivery address" },
+        "trackingNumber": { "type": "string", "description": "Unique order tracking number" },
+        "items": { "type": "array", "description": "List of cart items" },
+        "total": { "type": "number", "description": "Order total price including shipping" },
+        "status": { "type": "string", "enum": ["pending", "processing", "shipped", "delivered"], "description": "Current status of the order" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp when the order was created" }
+      },
+      "required": ["name", "email", "phone", "address", "items", "total", "status", "createdAt"]
+    },
+    "ChatThread": {
+      "title": "Chat Thread",
+      "description": "A conversation thread between a user and the admin.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "lastMessage": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "userName", "lastMessage", "updatedAt"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "A single message within a chat thread.",
+      "type": "object",
+      "properties": {
+        "text": { "type": "string" },
+        "senderId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["text", "senderId", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Collection of customer orders."
+    },
+    "/chats/{chatId}": {
+      "schema": "ChatThread",
+      "description": "Collection of chat threads."
+    },
+    "/chats/{chatId}/messages/{messageId}": {
+      "schema": "Message",
+      "description": "Subcollection of messages in a thread."
+    }
+  }
+}
