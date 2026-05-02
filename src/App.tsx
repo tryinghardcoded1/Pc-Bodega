@@ -226,7 +226,7 @@ const PRODUCTS: Product[] = [
   {
     id: 'p4',
     name: 'Samsung 1TB NVMe M.2 SSD',
-    price: 5500,
+    price: 3990,
     category: 'SSD',
     subcategory: 'SAMSUNG',
     rating: 4.8,
@@ -237,7 +237,7 @@ const PRODUCTS: Product[] = [
   {
     id: 'p5',
     name: 'Samsung 2TB NVMe M.2 SSD',
-    price: 6500,
+    price: 4990,
     category: 'SSD',
     subcategory: 'SAMSUNG',
     rating: 4.9,
@@ -288,6 +288,27 @@ export default function App() {
   const [showPopup, setShowPopup] = useState(false);
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<any>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [pendingOrder, setPendingOrder] = useState<any>(null);
+  const [appliedVoucher, setAppliedVoucher] = useState<string | null>(null);
+
+  const cartDiscount = appliedVoucher === 'LABORDAY1000' ? cart.reduce((acc, item) => {
+    let discount = 0;
+    if (item.product.id === 'p5') discount = 990;
+    if (item.product.id === 'p4') discount = 390;
+    return acc + (discount * item.quantity);
+  }, 0) : 0;
+
+  // Sound Notification logic
+  const playNotificationSound = () => {
+    try {
+      const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3');
+      audio.volume = 0.5;
+      audio.play().catch(e => console.log('Sound blocked by browser interaction policy'));
+    } catch (e) {
+      console.error('Error playing sound', e);
+    }
+  };
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (currUser) => {
@@ -296,6 +317,24 @@ export default function App() {
         // Updated admin check to include the requested credentials pattern
         const isUserAdmin = currUser.email === 'paoloesteban75@gmail.com' || currUser.email === 'akolangpo@pcbodega.com';
         setIsAdmin(isUserAdmin);
+
+        // Listen for unread messages overall if needed, or just track snapshot changes
+        const constraints = [where(isUserAdmin ? 'hasAdminUnread' : 'hasUserUnread', '==', true)];
+        if (!isUserAdmin) {
+          constraints.push(where('userId', '==', currUser.uid));
+        }
+        const q = query(collection(db, 'chats'), ...constraints);
+        const unsubUnread = onSnapshot(q, (snap) => {
+          if (!snap.empty && snap.docs.length > (isAdmin ? 0 : 0)) { // Simple logic to detect new
+            setUnreadCount(snap.docs.length);
+            // We only play sound if we are not currently viewing the chat
+            if (view !== 'admin_chat') {
+               playNotificationSound();
+            }
+          } else {
+            setUnreadCount(0);
+          }
+        });
         
         // Bootstrap admin record in Firestore if they are a designated admin
         if (isUserAdmin) {
@@ -375,11 +414,14 @@ export default function App() {
       items: cart.map(item => ({
         id: item.id,
         name: item.product.name,
+        image: item.product.image,
         variant: item.selectedVariant?.name || null,
         price: item.selectedVariant ? item.selectedVariant.price : item.product.price,
         quantity: item.quantity
       })),
-      total: cartSubtotal + DELIVERY_FEE,
+      voucher: appliedVoucher,
+      discount: cartDiscount,
+      total: cartSubtotal - cartDiscount + DELIVERY_FEE,
       status: 'pending',
       createdAt: serverTimestamp()
     };
@@ -394,12 +436,13 @@ export default function App() {
         await setDoc(doc(db, chatPath, chatId), {
           userId: currentUser.uid,
           userName: currentUser.displayName || checkoutData.name,
-          lastMessage: `New Order: ${trackingNumber} (${formatPHP(cartSubtotal + DELIVERY_FEE)})`,
+          lastMessage: `New Order: ${trackingNumber} (${formatPHP(cartSubtotal - cartDiscount + DELIVERY_FEE)})`,
           updatedAt: serverTimestamp()
         }, { merge: true });
 
         // Instant chat box appearance as requested
         setSelectedChatId(currentUser.uid);
+        setPendingOrder(orderData);
         setView('admin_chat');
       }
 
@@ -519,7 +562,7 @@ export default function App() {
           >
             <ShoppingCart className="w-5 h-5" />
             {cartItemsCount > 0 && (
-              <span className="absolute 0-top-1 -right-1 bg-sky-500 text-black text-[10px] font-bold w-4 h-4 flex items-center justify-center rounded-full">
+              <span className="absolute -top-1 -right-1 bg-sky-500 text-black text-[10px] font-bold w-4 h-4 flex items-center justify-center rounded-full">
                 {cartItemsCount}
               </span>
             )}
@@ -590,6 +633,9 @@ export default function App() {
               <CheckoutView 
                 cart={cart} 
                 subtotal={cartSubtotal} 
+                discount={cartDiscount}
+                appliedVoucher={appliedVoucher}
+                setAppliedVoucher={setAppliedVoucher}
                 checkoutData={checkoutData}
                 setCheckoutData={setCheckoutData}
                 onProceed={handleCheckout} 
@@ -604,12 +650,16 @@ export default function App() {
             </motion.div>
           )}
 
-          {view === 'admin_chat' && isAdmin && selectedChatId && (
+          {view === 'admin_chat' && selectedChatId && (
              <motion.div key="admin_chat" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="flex-1">
-                <AdminChatView chatId={selectedChatId} onBack={() => setView('admin')} />
+                <AdminChatView 
+                  chatId={selectedChatId} 
+                  onBack={() => { setView(isAdmin ? 'admin' : 'dashboard'); setPendingOrder(null); }} 
+                  pendingOrder={pendingOrder}
+                  onClearPending={() => setPendingOrder(null)}
+                />
              </motion.div>
           )}
-
           {view === 'auth' && (
             <motion.div key="auth" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex-1">
                <AuthView onAuthSuccess={() => setView('dashboard')} />
@@ -618,7 +668,7 @@ export default function App() {
 
           {view === 'dashboard' && user && (
             <motion.div key="dashboard" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex-1">
-               <UserDashboardView user={user} profile={userProfile} onSignOut={() => { setView('store'); }} onNavigate={setView} />
+               <UserDashboardView user={user} profile={userProfile} onSignOut={() => { setView('store'); }} onNavigate={setView} unreadCount={unreadCount} />
             </motion.div>
           )}
 
@@ -641,6 +691,12 @@ export default function App() {
             className="fixed bottom-6 right-6 w-14 h-14 bg-sky-500 text-black rounded-full shadow-2xl flex items-center justify-center hover:scale-110 transition-all z-40 group"
           >
              <MessageSquare className="w-6 h-6" />
+             {unreadCount > 0 && (
+               <span className="absolute -top-1 -right-1 flex h-5 w-5">
+                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                 <span className="relative inline-flex rounded-full h-5 w-5 bg-red-500 text-[10px] items-center justify-center text-white font-bold">{unreadCount}</span>
+               </span>
+             )}
              <span className="absolute right-full mr-4 bg-bg-surface border border-white/10 px-3 py-1.5 rounded-lg text-xs font-bold text-white whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">Chat with Seller</span>
           </button>
         )}
@@ -1252,7 +1308,13 @@ function AdminDashboard({ onOpenChat }: { onOpenChat: (id: string) => void }) {
              ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                    {chats.map(chat => (
-                      <div key={chat.id} onClick={() => onOpenChat(chat.id)} className="bg-bg-card border border-white/5 p-6 rounded-2xl cursor-pointer hover:border-orange-500/50 transition-all group shadow-lg">
+                      <div key={chat.id} onClick={() => onOpenChat(chat.id)} className={`relative bg-bg-card border p-6 rounded-2xl cursor-pointer hover:border-orange-500/50 transition-all group shadow-lg ${chat.hasAdminUnread ? 'border-sky-500/50 ring-1 ring-sky-500/20' : 'border-white/5'}`}>
+                         {chat.hasAdminUnread && (
+                           <span className="absolute top-4 right-4 flex h-3 w-3">
+                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
+                             <span className="relative inline-flex rounded-full h-3 w-3 bg-sky-500"></span>
+                           </span>
+                         )}
                          <div className="flex justify-between items-start mb-4">
                             <div className="flex items-center gap-3">
                                <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center font-bold text-slate-300">
@@ -1276,22 +1338,88 @@ function AdminDashboard({ onOpenChat }: { onOpenChat: (id: string) => void }) {
     </div>
   );
 }
-function AdminChatView({ chatId, onBack }: { chatId: string, onBack: () => void }) {
+function AdminChatView({ chatId, onBack, pendingOrder, onClearPending }: { chatId: string, onBack: () => void, pendingOrder?: any, onClearPending?: () => void }) {
   const [messages, setMessages] = useState<any[]>([]);
   const [inputText, setInputText] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const initialized = useRef(false);
 
   useEffect(() => {
     const q = query(collection(db, 'chats', chatId, 'messages'), orderBy('createdAt', 'asc'));
     const unsub = onSnapshot(q, (snapshot) => {
-      setMessages(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      const newMessages = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      
+      // Play sound for new incoming messages after initial load
+      if (initialized.current && newMessages.length > messages.length) {
+         const lastMsg: any = newMessages[newMessages.length - 1];
+         if (lastMsg.senderId !== auth.currentUser?.uid) {
+            // Play sound (using the global function if passed or just local)
+            const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3');
+            audio.volume = 0.5;
+            audio.play().catch(() => {});
+         }
+      }
+      
+      setMessages(newMessages);
+      initialized.current = true;
     });
+
+    // Mark as read when opening
+    const markAsRead = async () => {
+      try {
+        const isUserAdmin = auth.currentUser?.email === 'paoloesteban75@gmail.com' || auth.currentUser?.email === 'akolangpo@pcbodega.com';
+        await setDoc(doc(db, 'chats', chatId), {
+          [isUserAdmin ? 'hasAdminUnread' : 'hasUserUnread']: false
+        }, { merge: true });
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    markAsRead();
+
     return unsub;
   }, [chatId]);
 
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !auth.currentUser) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      alert("Image is too large. Max 2MB.");
+      return;
+    }
+
+    setIsUploading(true);
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const base64 = event.target?.result as string;
+      try {
+        await addDoc(collection(db, 'chats', chatId, 'messages'), {
+          imageUrl: base64,
+          senderId: auth.currentUser?.uid,
+          createdAt: serverTimestamp()
+        });
+        
+        await setDoc(doc(db, 'chats', chatId), {
+          lastMessage: '📷 Sent an image',
+          updatedAt: serverTimestamp(),
+          hasAdminUnread: auth.currentUser?.uid === chatId, // If user sent it, admin has unread
+          hasUserUnread: auth.currentUser?.uid !== chatId  // If admin sent it, user has unread
+        }, { merge: true });
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setIsUploading(false);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
 
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1301,6 +1429,8 @@ function AdminChatView({ chatId, onBack }: { chatId: string, onBack: () => void 
     setInputText('');
 
     try {
+      const isUserAdmin = auth.currentUser?.email === 'paoloesteban75@gmail.com' || auth.currentUser?.email === 'akolangpo@pcbodega.com';
+      
       await addDoc(collection(db, 'chats', chatId, 'messages'), {
         text,
         senderId: auth.currentUser.uid,
@@ -1309,7 +1439,9 @@ function AdminChatView({ chatId, onBack }: { chatId: string, onBack: () => void 
       
       await setDoc(doc(db, 'chats', chatId), {
         lastMessage: text,
-        updatedAt: serverTimestamp()
+        updatedAt: serverTimestamp(),
+        hasAdminUnread: !isUserAdmin,
+        hasUserUnread: isUserAdmin
       }, { merge: true });
     } catch (err) {
       console.error(err);
@@ -1328,10 +1460,85 @@ function AdminChatView({ chatId, onBack }: { chatId: string, onBack: () => void 
              <span className="text-[10px] text-slate-500 uppercase font-bold px-2 py-1 bg-white/5 rounded">Live Thread</span>
           </div>
           <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
+             {pendingOrder && (
+               <div className="mx-auto max-w-sm mb-6 bg-sky-500/10 border border-sky-500/30 rounded-2xl p-4 shadow-xl">
+                 <div className="flex items-start gap-4 mb-3 border-b border-sky-500/20 pb-4">
+                   <div className="w-16 h-16 rounded-lg bg-white/5 overflow-hidden flex-shrink-0 border border-sky-500/20">
+                      <img 
+                        src={pendingOrder.items?.[0]?.image || 'https://i.imgur.com/6ApxjHs.jpg'} 
+                        className="w-full h-full object-cover" 
+                        alt="" 
+                      />
+                   </div>
+                   <div>
+                     <h3 className="font-bold text-sm text-sky-400 tracking-tight leading-tight mb-1">
+                       {pendingOrder.items?.length > 1 
+                         ? `${pendingOrder.items[0].name} +${pendingOrder.items.length - 1} more` 
+                         : pendingOrder.items?.[0]?.name}
+                     </h3>
+                     <div className="flex items-center gap-2 text-[10px] text-slate-500 font-bold uppercase tracking-widest">
+                       <ShoppingBag className="w-3 h-3" />
+                       Pending Order
+                     </div>
+                   </div>
+                 </div>
+                 <div className="space-y-2 mb-4">
+                   {pendingOrder.items?.map((item: any, i: number) => (
+                     <div key={i} className="flex justify-between text-xs text-slate-300">
+                       <span>{item.quantity}x {item.name} {item.variant ? `(${item.variant})` : ''}</span>
+                       <span className="font-mono">{formatPHP(item.price * item.quantity)}</span>
+                     </div>
+                   ))}
+                   <div className="pt-2 border-t border-sky-500/10 flex justify-between text-xs text-slate-400">
+                     <span>Delivery Fee</span>
+                     <span className="font-mono">{formatPHP(150)}</span>
+                   </div>
+                   <div className="flex justify-between text-sm font-bold text-white pt-1">
+                     <span>Total Amount</span>
+                     <span className="font-mono text-sky-400">{formatPHP(pendingOrder.total)}</span>
+                   </div>
+                 </div>
+                 <button 
+                   onClick={async () => {
+                     if (!auth.currentUser) return;
+                     const summaryText = `📦 Order Details:\n${pendingOrder.items.map((it: any) => `- ${it.quantity}x ${it.name} (${formatPHP(it.price)})`).join('\n')}\n🚚 Delivery: ${formatPHP(150)}\n💰 Total: ${formatPHP(pendingOrder.total)}\n📍 Tracking: ${pendingOrder.trackingNumber}`;
+                     
+                     try {
+                        await addDoc(collection(db, 'chats', chatId, 'messages'), {
+                          text: summaryText,
+                          senderId: auth.currentUser.uid,
+                          createdAt: serverTimestamp()
+                        });
+                        await setDoc(doc(db, 'chats', chatId), {
+                          lastMessage: 'Sent order details',
+                          updatedAt: serverTimestamp(),
+                          hasUserUnread: false,
+                          hasAdminUnread: true
+                        }, { merge: true });
+                        onClearPending?.();
+                     } catch (err) {
+                        console.error(err);
+                     }
+                   }}
+                   className="w-full bg-sky-500 hover:bg-sky-400 text-black font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 transition-all"
+                 >
+                   <Send className="w-3.5 h-3.5" /> Send Order Details to Seller
+                 </button>
+               </div>
+             )}
+
              {messages.map((m) => (
                <div key={m.id} className={`flex ${m.senderId === auth.currentUser?.uid ? 'justify-end' : 'justify-start'}`}>
                   <div className={`max-w-[80%] p-4 rounded-2xl text-sm ${m.senderId === auth.currentUser?.uid ? 'bg-sky-500 text-black font-medium' : 'bg-white/5 text-slate-300 border border-white/5'}`}>
-                     {m.text}
+                     {m.imageUrl && (
+                       <img 
+                         src={m.imageUrl} 
+                         alt="Uploaded Content" 
+                         className="w-full max-h-60 object-cover rounded-lg mb-2 shadow-sm border border-white/10" 
+                         referrerPolicy="no-referrer"
+                       />
+                     )}
+                     {m.text && <p>{m.text}</p>}
                   </div>
                </div>
              ))}
@@ -1339,10 +1546,25 @@ function AdminChatView({ chatId, onBack }: { chatId: string, onBack: () => void 
           </div>
           <form onSubmit={sendMessage} className="p-4 bg-black/40 border-t border-white/5 flex gap-2">
              <input 
+               type="file" 
+               accept="image/*" 
+               className="hidden" 
+               ref={fileInputRef} 
+               onChange={handleImageUpload} 
+             />
+             <button 
+               type="button" 
+               onClick={() => fileInputRef.current?.click()}
+               disabled={isUploading}
+               className="p-3 bg-white/5 text-slate-400 rounded-xl hover:text-white transition-colors"
+             >
+                <Plus className={`w-5 h-5 ${isUploading ? 'animate-spin' : ''}`} />
+             </button>
+             <input 
                type="text" 
                value={inputText}
                onChange={(e) => setInputText(e.target.value)}
-               placeholder="Type a message to customer..." 
+               placeholder="Type a message..." 
                className="flex-1 bg-bg-surface border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-sky-500"
              />
              <button type="submit" className="p-3 bg-sky-500 text-black rounded-xl hover:bg-sky-400 transition-colors">
@@ -1446,7 +1668,7 @@ function AuthView({ onAuthSuccess }: { onAuthSuccess: () => void }) {
   );
 }
 
-function UserDashboardView({ user, profile, onSignOut, onNavigate }: { user: FirebaseUser, profile: any, onSignOut: () => void, onNavigate: (v: ViewState) => void }) {
+function UserDashboardView({ user, profile, onSignOut, onNavigate, unreadCount }: { user: FirebaseUser, profile: any, onSignOut: () => void, onNavigate: (v: ViewState) => void, unreadCount: number }) {
   const [activeTab, setActiveTab] = useState<'profile' | 'orders' | 'chat'>('orders');
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1488,8 +1710,11 @@ function UserDashboardView({ user, profile, onSignOut, onNavigate }: { user: Fir
                 <button onClick={() => setActiveTab('profile')} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl text-xs font-bold transition-all ${activeTab === 'profile' ? 'bg-sky-500 text-black' : 'hover:bg-white/5 text-slate-400'}`}>
                    <User className="w-4 h-4" /> My Profile
                 </button>
-                <button onClick={() => setActiveTab('chat')} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl text-xs font-bold transition-all ${activeTab === 'chat' ? 'bg-sky-500 text-black' : 'hover:bg-white/5 text-slate-400'}`}>
-                   <MessageSquare className="w-4 h-4" /> Live Support
+                <button onClick={() => setActiveTab('chat')} className={`w-full flex items-center justify-between px-4 py-3.5 rounded-2xl text-xs font-bold transition-all ${activeTab === 'chat' ? 'bg-sky-500 text-black' : 'hover:bg-white/5 text-slate-400'}`}>
+                   <div className="flex items-center gap-3">
+                      <MessageSquare className="w-4 h-4" /> Live Support
+                   </div>
+                   {unreadCount > 0 && <span className="bg-red-500 text-white text-[8px] px-1.5 py-0.5 rounded-full animate-bounce">NEW</span>}
                 </button>
                 <button onClick={() => onNavigate('tracking')} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl text-xs font-bold transition-all hover:bg-white/5 text-slate-400`}>
                    <Search className="w-4 h-4" /> Track Order
@@ -1721,9 +1946,18 @@ function AboutView({ onNavigate }: { onNavigate: (view: ViewState) => void }) {
 }
 
 // 2. Checkout View Component
-function CheckoutView({ cart, subtotal, checkoutData, setCheckoutData, onProceed, onBack }: any) {
-  const tax = subtotal * 0.08;
-  const total = subtotal + DELIVERY_FEE;
+function CheckoutView({ cart, subtotal, discount, appliedVoucher, setAppliedVoucher, checkoutData, setCheckoutData, onProceed, onBack }: any) {
+  const [voucherInput, setVoucherInput] = useState('');
+  const total = subtotal - discount + DELIVERY_FEE;
+
+  const handleApplyVoucher = () => {
+    if (voucherInput.toUpperCase() === 'LABORDAY1000') {
+      setAppliedVoucher('LABORDAY1000');
+      alert('Voucher applied successfully!');
+    } else {
+      alert('Invalid voucher code');
+    }
+  };
 
   if (cart.length === 0) {
     return (
@@ -1786,8 +2020,40 @@ function CheckoutView({ cart, subtotal, checkoutData, setCheckoutData, onProceed
         <div className="lg:col-span-5">
            <div className="bg-bg-surface border border-white/10 rounded-2xl p-8 sticky top-24 shadow-2xl">
               <h3 className="text-lg font-bold uppercase mb-6 flex items-center gap-2 tracking-wider">Order Summary</h3>
+
+              {/* Voucher Section */}
+              <div className="mb-6 bg-black/20 p-4 rounded-xl border border-white/5">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-2">Voucher Code</label>
+                <div className="flex gap-2">
+                  <input 
+                    type="text" 
+                    value={voucherInput} 
+                    onChange={(e) => setVoucherInput(e.target.value)}
+                    className="flex-1 bg-black/40 border border-white/10 text-xs rounded-lg px-3 py-2 outline-none focus:border-sky-500 font-mono text-white" 
+                    placeholder="Enter code" 
+                  />
+                  <button 
+                    type="button"
+                    onClick={handleApplyVoucher}
+                    className="bg-sky-500 hover:bg-sky-400 text-black text-[10px] px-3 rounded-lg font-extrabold transition-all uppercase"
+                  >
+                    Apply
+                  </button>
+                </div>
+                {appliedVoucher === 'LABORDAY1000' && (
+                  <div className="mt-3 text-sky-400 text-[10px] font-bold uppercase tracking-widest flex items-center gap-2">
+                    <ShieldCheck className="w-3 h-3" /> LABORDAY1000 Applied
+                  </div>
+                )}
+              </div>
               <div className="space-y-3 mb-6 text-sm text-slate-300">
                  <div className="flex justify-between"><span className="text-slate-400 font-bold uppercase tracking-widest text-[10px]">Subtotal Inventory</span><span className="font-mono text-white">{formatPHP(subtotal)}</span></div>
+                 {discount > 0 && (
+                   <div className="flex justify-between text-sky-400 font-bold items-center">
+                     <span className="uppercase tracking-widest text-[10px]">Voucher Discount</span>
+                     <span className="font-mono">-{formatPHP(discount)}</span>
+                   </div>
+                 )}
                  <div className="flex justify-between border-t border-white/5 pt-3"><span className="text-slate-500 italic">Delivery Fee (Flat Rate)</span><span className="font-mono text-slate-400">{formatPHP(DELIVERY_FEE)}</span></div>
               </div>
               <div className="border-t border-white/10 pt-5 mb-8 flex justify-between items-end">

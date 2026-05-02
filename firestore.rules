@@ -13,14 +13,15 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return isSignedIn() && (
-        request.auth.token.email == 'paoloesteban75@gmail.com' ||
-        request.auth.token.email == 'akolangpo@pcbodega.com'
-      );
+      return isSignedIn() && 
+             request.auth.token.email_verified == true && (
+               request.auth.token.email == 'paoloesteban75@gmail.com' ||
+               request.auth.token.email == 'akolangpo@pcbodega.com'
+             );
     }
 
     function isValidId(id) {
-      return id is string && id.size() <= 128;
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
 
     function incoming() {
@@ -31,60 +32,120 @@ service cloud.firestore {
       return resource.data;
     }
 
-    // --- Validation Functions ---
-    function isValidOrder(data) {
-      return data.keys().hasAll(['name', 'email', 'phone', 'address', 'items', 'total', 'status', 'createdAt', 'trackingNumber']) &&
-             data.name is string &&
-             data.email is string;
-    }
+    // --- Validation Blueprints ---
 
     function isValidUser(data) {
       return data.keys().hasAll(['displayName', 'updatedAt']) &&
-             data.displayName is string;
+             data.keys().size() == 2 &&
+             data.displayName is string &&
+             data.displayName.size() <= 100 &&
+             data.updatedAt == request.time;
+    }
+
+    function isValidOrder(data) {
+      return data.keys().hasAll(['name', 'email', 'phone', 'address', 'items', 'total', 'status', 'createdAt', 'trackingNumber', 'userId']) &&
+             data.keys().size() <= 15 &&
+             data.name is string && data.name.size() <= 100 &&
+             data.email is string && data.email.size() <= 100 &&
+             data.phone is string && data.phone.size() <= 20 &&
+             data.address is string && data.address.size() <= 500 &&
+             data.trackingNumber is string && data.trackingNumber.size() <= 50 &&
+             data.total is number && data.total >= 0 &&
+             data.status in ['pending', 'processing', 'shipped', 'delivered'] &&
+             data.items is list && data.items.size() > 0 && data.items.size() <= 50 &&
+             data.createdAt == request.time &&
+             (data.userId == null || (data.userId is string && data.userId == request.auth.uid)) &&
+             (!data.keys().has('voucher') || (data.voucher is string || data.voucher == null)) &&
+             (!data.keys().has('discount') || data.discount is number);
     }
 
     function isValidChatThread(data) {
-      return data.keys().hasAll(['userId', 'userName', 'updatedAt']) &&
-             data.userId is string &&
-             data.userName is string;
+      return data.keys().hasAll(['userId', 'userName', 'lastMessage', 'updatedAt']) &&
+             data.keys().size() <= 12 &&
+             data.userId is string && data.userId.size() <= 128 &&
+             data.userName is string && data.userName.size() <= 100 &&
+             data.lastMessage is string && data.lastMessage.size() <= 500 &&
+             data.updatedAt == request.time &&
+             (!data.keys().has('hasAdminUnread') || data.hasAdminUnread is bool) &&
+             (!data.keys().has('hasUserUnread') || data.hasUserUnread is bool);
     }
 
     function isValidMessage(data) {
-      return data.keys().hasAll(['text', 'senderId', 'createdAt']) &&
-             data.text is string &&
-             data.senderId == request.auth.uid;
+      return (data.keys().hasAny(['text', 'imageUrl'])) &&
+             data.keys().hasAll(['senderId', 'createdAt']) &&
+             data.keys().size() <= 5 &&
+             (!data.keys().has('text') || (data.text is string && data.text.size() <= 5000)) &&
+             (!data.keys().has('imageUrl') || (data.imageUrl is string && data.imageUrl.size() <= 1000000)) &&
+             data.senderId == request.auth.uid &&
+             data.createdAt == request.time;
     }
 
     // --- Collection Rules ---
 
     // Users Collection
     match /users/{userId} {
-      allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow get: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      allow list: if isAdmin(); // Users should normally get their specific doc
+      allow create: if isSignedIn() && request.auth.uid == userId && isValidUser(incoming());
+      allow update: if isSignedIn() && request.auth.uid == userId && 
+                    isValidUser(incoming()) &&
+                    incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'updatedAt']);
+      allow delete: if isAdmin();
     }
 
     // Admins Collection
     match /admins/{adminId} {
-      allow read, write: if isSignedIn() && (request.auth.token.email == 'paoloesteban75@gmail.com' || request.auth.token.email == 'akolangpo@pcbodega.com' || isAdmin());
+      allow read: if isAdmin();
+      allow write: if isAdmin();
     }
 
     // Orders Collection
     match /orders/{orderId} {
       allow create: if isValidId(orderId) && isValidOrder(incoming());
-      allow read: if isAdmin() || (isSignedIn() && (resource == null || resource.data.userId == request.auth.uid)) || (resource != null && resource.data.trackingNumber != null);
-      allow update, delete: if isAdmin();
+      
+      // Pivot: Secure List Queries (Pillar 8)
+      allow get: if isAdmin() || 
+                  (isSignedIn() && resource.data.userId == request.auth.uid) || 
+                  (resource.data.trackingNumber != null); // Guest check
+                  
+      allow list: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      
+      allow update: if isAdmin() && 
+                    incoming().diff(existing()).affectedKeys().hasAny(['status', 'trackingNumber']) &&
+                    incoming().createdAt == existing().createdAt; // Immutable creation time
+                    
+      allow delete: if isAdmin();
     }
 
     // Chat Threads
     match /chats/{chatId} {
-      allow create: if isValidId(chatId) && (incoming().userId == request.auth.uid || isAdmin());
-      allow read: if isAdmin() || (isSignedIn() && (resource == null || resource.data.userId == request.auth.uid));
-      allow update: if isAdmin() || (isSignedIn() && (resource == null || resource.data.userId == request.auth.uid));
+      allow create: if isValidId(chatId) && 
+                    isValidChatThread(incoming()) &&
+                    (incoming().userId == request.auth.uid || isAdmin());
+                    
+      allow get: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow list: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      
+      allow update: if (isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid)) &&
+                    isValidChatThread(incoming());
+                    
+      allow delete: if isAdmin();
     }
 
     // Chat Messages
     match /chats/{chatId}/messages/{messageId} {
-      allow create: if isValidId(messageId) && isValidMessage(incoming());
-      allow read: if isAdmin() || (isSignedIn() && get(/databases/$(database)/documents/chats/$(chatId)).data.userId == request.auth.uid);
+      // Master Gate: Relational Sync (Pillar 1)
+      function canAccessThread() {
+        let thread = get(/databases/$(database)/documents/chats/$(chatId)).data;
+        return isAdmin() || (isSignedIn() && thread.userId == request.auth.uid);
+      }
+
+      allow create: if isValidId(messageId) && 
+                    isValidMessage(incoming()) && 
+                    canAccessThread();
+                    
+      allow read: if canAccessThread();
+      allow update, delete: if isAdmin();
     }
   }
 }
