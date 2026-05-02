@@ -23,6 +23,7 @@ import {
   ShoppingBag,
   Truck,
   Image as ImageIcon,
+  Trash2,
   Camera
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -32,7 +33,7 @@ import {
   User as FirebaseUser,
   signOut
 } from 'firebase/auth';
-import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, doc, setDoc, where, getDocs, getDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, doc, setDoc, where, getDocs, getDoc, deleteDoc } from 'firebase/firestore';
 import { 
   auth, 
   db, 
@@ -1329,6 +1330,20 @@ function AdminDashboard({ onOpenChat }: { onOpenChat: (id: string) => void }) {
                                  Message User <MessageSquare className="w-3 h-3" />
                               </button>
                            )}
+                           <button 
+                             onClick={async () => {
+                               if (!window.confirm('Are you sure you want to cancel/reject this order?')) return;
+                               try {
+                                 await setDoc(doc(db, 'orders', order.id), { status: 'cancelled' }, { merge: true });
+                               } catch (err) {
+                                 console.error('Error cancelling order:', err);
+                                 alert('Failed to cancel order.');
+                               }
+                             }}
+                             className="text-xs font-bold text-red-500 hover:text-white uppercase tracking-widest transition-colors flex items-center gap-2"
+                           >
+                              Cancel <Trash2 className="w-3 h-3" />
+                           </button>
                            <button className="text-xs font-bold text-sky-500 hover:text-white uppercase tracking-widest transition-colors flex items-center gap-2">
                               Update Status <ArrowRight className="w-3 h-3" />
                            </button>
@@ -1489,9 +1504,30 @@ function AdminChatView({ chatId, onBack, pendingOrder, onClearPending }: { chatI
     }
   };
 
+  const endConversation = async () => {
+    if (!window.confirm('Are you sure you want to end this conversation? This will delete the chat thread.')) return;
+    
+    try {
+      await deleteDoc(doc(db, 'chats', chatId));
+      onBack();
+    } catch (err) {
+      console.error('Error ending conversation:', err);
+      alert('Failed to end conversation. Check permissions.');
+    }
+  };
+
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 flex flex-col h-[calc(100vh-120px)]">
-       <button onClick={onBack} className="flex items-center gap-2 text-slate-400 hover:text-white mb-6 text-sm"><ChevronLeft className="w-4 h-4" /> Back to Dashboard</button>
+       <div className="flex items-center justify-between mb-6">
+         <button onClick={onBack} className="flex items-center gap-2 text-slate-400 hover:text-white text-sm"><ChevronLeft className="w-4 h-4" /> Back to Dashboard</button>
+         <button 
+           onClick={endConversation}
+           className="flex items-center gap-2 px-4 py-2 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all border border-red-500/20"
+         >
+           <Trash2 className="w-3.5 h-3.5" />
+           End Conversation
+         </button>
+       </div>
        <div className="flex-1 bg-bg-card border border-white/10 rounded-3xl overflow-hidden flex flex-col shadow-2xl">
           <div className="p-4 bg-black/40 border-b border-white/5 flex items-center justify-between">
              <div className="flex items-center gap-3">
@@ -1808,9 +1844,27 @@ function UserDashboardView({ user, profile, onSignOut, onNavigate, unreadCount }
                                     </div>
                                     <p className="text-xs text-slate-400">Total: {formatPHP(order.total)} • Placed on {order.createdAt?.toDate?.()?.toLocaleDateString()}</p>
                                  </div>
-                                 <button onClick={() => { setActiveTab('chat') }} className="text-xs font-bold text-sky-400 hover:text-white uppercase tracking-widest py-2 px-4 border border-sky-400/20 rounded-lg hover:border-sky-400 transition-all flex items-center gap-2">
-                                    Track Delivery <MapPin className="w-3.5 h-3.5" />
-                                 </button>
+                                 <div className="flex items-center gap-3">
+                                    {order.status === 'pending' && (
+                                       <button 
+                                         onClick={async () => {
+                                           if (!window.confirm('Are you sure you want to cancel this order?')) return;
+                                           try {
+                                             await setDoc(doc(db, 'orders', order.id), { status: 'cancelled' }, { merge: true });
+                                           } catch (err) {
+                                             console.error('Error cancelling order:', err);
+                                             alert('Failed to cancel order.');
+                                           }
+                                         }}
+                                         className="text-xs font-bold text-red-500 hover:text-white uppercase tracking-widest py-2 px-4 border border-red-500/20 rounded-lg hover:bg-red-500 transition-all"
+                                       >
+                                         Cancel
+                                       </button>
+                                    )}
+                                    <button onClick={() => { setActiveTab('chat') }} className="text-xs font-bold text-sky-400 hover:text-white uppercase tracking-widest py-2 px-4 border border-sky-400/20 rounded-lg hover:border-sky-400 transition-all flex items-center gap-2">
+                                       Track Delivery <MapPin className="w-3.5 h-3.5" />
+                                    </button>
+                                 </div>
                               </div>
                            </div>
                         ))}
