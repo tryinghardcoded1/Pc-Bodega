@@ -320,25 +320,33 @@ export default function App() {
         const isUserAdmin = currUser.email === 'paoloesteban75@gmail.com' || currUser.email === 'akolangpo@pcbodega.com';
         setIsAdmin(isUserAdmin);
 
-        // Listen for unread messages overall if needed, or just track snapshot changes
-        const constraints = [where(isUserAdmin ? 'hasAdminUnread' : 'hasUserUnread', '==', true)];
-        if (!isUserAdmin) {
-          constraints.push(where('userId', '==', currUser.uid));
-        }
-        const q = query(collection(db, 'chats'), ...constraints);
-        const unsubUnread = onSnapshot(q, (snap) => {
-          if (!snap.empty && snap.docs.length > (isAdmin ? 0 : 0)) { // Simple logic to detect new
+        // Listen for unread messages
+        let unsubUnread;
+        if (isUserAdmin) {
+          const q = query(collection(db, 'chats'), where('hasAdminUnread', '==', true));
+          unsubUnread = onSnapshot(q, (snap) => {
             setUnreadCount(snap.docs.length);
-            // We only play sound if we are not currently viewing the chat
-            if (view !== 'admin_chat') {
-               playNotificationSound();
+            if (!snap.empty && view !== 'admin_chat') {
+              playNotificationSound();
             }
-          } else {
-            setUnreadCount(0);
-          }
-        }, (err) => {
-          handleFirestoreError(err, OperationType.GET, 'chats');
-        });
+          }, (err) => {
+            console.error('Error listening for admin unreads', err);
+          });
+        } else {
+          // Individual user just listens to their own document
+          unsubUnread = onSnapshot(doc(db, 'chats', currUser.uid), (docSnap) => {
+            if (docSnap.exists() && docSnap.data().hasUserUnread) {
+              setUnreadCount(1);
+              if (view !== 'user_dashboard') {
+                playNotificationSound();
+              }
+            } else {
+              setUnreadCount(0);
+            }
+          }, (err) => {
+            console.error('Error listening for user unreads', err);
+          });
+        }
         
         // Bootstrap admin record in Firestore if they are a designated admin
         if (isUserAdmin) {
