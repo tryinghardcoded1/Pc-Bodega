@@ -571,7 +571,7 @@ export default function App() {
         </div>
 
         <nav className="hidden lg:flex gap-8 text-sm font-medium text-slate-400">
-          <button onClick={() => navigateTo('store')} className={(view === 'store' || view === 'product') ? 'text-sky-400 font-bold' : 'hover:text-white transition-colors'}>Inventory</button>
+          <button onClick={() => navigateTo('store')} className={(view === 'store' || view === 'product') ? 'text-sky-400 font-bold' : 'hover:text-white transition-colors'}>Home</button>
           <button onClick={() => navigateTo('tracking')} className={view === 'tracking' ? 'text-sky-400 font-bold' : 'hover:text-white transition-colors'}>Track Order</button>
           <button onClick={() => navigateTo('warehouse')} className={view === 'warehouse' ? 'text-sky-400 font-bold' : 'hover:text-white transition-colors'}>Our Warehouse</button>
           <button onClick={() => navigateTo('about')} className={view === 'about' ? 'text-sky-400 font-bold' : 'hover:text-white transition-colors'}>About Us</button>
@@ -616,12 +616,12 @@ export default function App() {
             className="lg:hidden bg-bg-surface border-b border-white/10 overflow-hidden absolute w-full z-30 top-[104px]"
           >
              <div className="p-4 flex flex-col gap-4 text-sm font-medium">
-                {isAdmin && <button onClick={() => navigateTo('admin')} className="text-left py-2 text-orange-400 font-bold">Seller Dashboard</button>}
-                <button onClick={() => navigateTo('store')} className="text-left py-2 hover:text-sky-400">Inventory</button>
-                <button onClick={() => navigateTo('tracking')} className="text-left py-2 hover:text-sky-400">Track Order</button>
-                <button onClick={() => navigateTo('warehouse')} className="text-left py-2 hover:text-sky-400">Our Warehouse</button>
-                <button onClick={() => navigateTo('about')} className="text-left py-2 hover:text-sky-400">About Us</button>
-                <button onClick={loginRedirect} className="text-left py-2 text-slate-400 border-t border-white/5 pt-4">{user ? 'My Dashboard' : 'Login / Register'}</button>
+                {isAdmin && <button onClick={() => { navigateTo('admin'); setIsMobileMenuOpen(false); }} className="text-left py-2 text-orange-400 font-bold">Seller Dashboard</button>}
+                <button onClick={() => { navigateTo('store'); setIsMobileMenuOpen(false); }} className="text-left py-2 hover:text-sky-400">Home</button>
+                <button onClick={() => { navigateTo('tracking'); setIsMobileMenuOpen(false); }} className="text-left py-2 hover:text-sky-400">Track Order</button>
+                <button onClick={() => { navigateTo('warehouse'); setIsMobileMenuOpen(false); }} className="text-left py-2 hover:text-sky-400">Our Warehouse</button>
+                <button onClick={() => { navigateTo('about'); setIsMobileMenuOpen(false); }} className="text-left py-2 hover:text-sky-400">About Us</button>
+                <button onClick={() => { loginRedirect(); setIsMobileMenuOpen(false); }} className="text-left py-2 text-slate-400 border-t border-white/5 pt-4">{user ? 'My Dashboard' : 'Login / Register'}</button>
              </div>
           </motion.div>
         )}
@@ -860,23 +860,23 @@ function Storefront({ products, onProductClick, onAddToCart, activeCategory, set
     : products;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 flex flex-col gap-8">
+    <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-6 sm:py-12 flex flex-col gap-6 sm:gap-8">
       {/* Website Banner */}
-      <div className="w-full h-auto overflow-hidden rounded-2xl border border-white/10 relative shadow-xl">
+      <div className="w-full h-auto overflow-hidden rounded-xl sm:rounded-2xl border border-white/10 relative shadow-xl">
          <img 
             src="https://i.imgur.com/v7LCEd5.jpg" 
             alt="PC Bodega Banner" 
-            className="w-full h-[200px] md:h-[400px] object-cover object-center" 
+            className="w-full h-[160px] sm:h-[300px] md:h-[400px] object-cover object-center" 
          />
-         <div className="absolute inset-0 bg-gradient-to-t from-[#0A0B0D] via-[#0A0B0D]/40 to-transparent opacity-90" />
-         <div className="absolute bottom-6 left-6 md:left-8">
-            <span className="bg-sky-500 text-black text-[10px] md:text-xs font-bold uppercase tracking-wider px-3 py-1 rounded italic mb-2 inline-block">Wholesale Ready</span>
-            <h2 className="text-2xl md:text-4xl font-bold tracking-tight text-white mb-2 leading-tight">Lowest Prices <br className="md:hidden" /> <span className="text-sky-400 italic">Guaranteed</span></h2>
-            <p className="text-slate-300 text-xs md:text-sm max-w-sm">Direct from warehouse pricing for retail customers.</p>
+         <div className="absolute inset-0 bg-gradient-to-t from-[#0A0B0D] via-[#0A0B0D]/20 to-transparent opacity-90" />
+         <div className="absolute bottom-4 left-4 sm:bottom-6 sm:left-6 md:left-8">
+            <span className="bg-sky-500 text-black text-[9px] sm:text-[10px] md:text-xs font-bold uppercase tracking-wider px-2 sm:px-3 py-0.5 sm:py-1 rounded italic mb-1 sm:mb-2 inline-block">Wholesale Ready</span>
+            <h2 className="text-xl sm:text-2xl md:text-4xl font-bold tracking-tight text-white mb-1 sm:mb-2 leading-tight">Lowest Prices <br className="sm:hidden" /> <span className="text-sky-400 italic">Guaranteed</span></h2>
+            <p className="text-slate-300 text-[10px] sm:text-xs md:text-sm max-w-sm opacity-90">Direct from warehouse pricing for hardware essentials.</p>
          </div>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-8">
+      <div className="flex flex-col lg:flex-row gap-6 sm:gap-8">
         
         {/* Mobile Category Dropdown */}
         <div className="lg:hidden w-full">
@@ -1013,48 +1013,48 @@ function ProductView({ product, onAddToCart, onBack }: { product: Product, onAdd
   const activePrice = selectedVariant ? selectedVariant.price : product.price;
 
   return (
-     <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
-        <button onClick={onBack} className="flex items-center gap-2 text-slate-400 hover:text-white mb-8 transition-colors group text-sm">
+     <div className="max-w-6xl mx-auto px-3 sm:px-6 lg:px-8 py-6 sm:py-12">
+        <button onClick={onBack} className="flex items-center gap-2 text-slate-400 hover:text-white mb-6 sm:mb-8 transition-colors group text-xs sm:text-sm font-bold uppercase tracking-widest">
           <ChevronLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" /> Back to Store
         </button>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-10 lg:gap-16">
-           <div className="w-full aspect-square bg-bg-image rounded-2xl border border-white/10 overflow-hidden shadow-2xl p-4 md:p-8 flex items-center justify-center">
-              <img src={product.image} alt={product.name} className="max-w-full max-h-full object-contain rounded-lg shadow-lg" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-10 lg:gap-16">
+           <div className="w-full aspect-square bg-bg-card rounded-xl sm:rounded-2xl border border-white/10 overflow-hidden shadow-2xl p-4 sm:p-8 flex items-center justify-center">
+              <img src={product.image} alt={product.name} className="max-w-full max-h-full object-contain rounded-lg shadow-xl" />
            </div>
            
            <div className="flex flex-col">
                <div className="mb-2">
-                 <span className="text-sky-500 text-xs font-bold uppercase tracking-widest">{product.category} {product.subcategory && `> ${product.subcategory}`}</span>
+                 <span className="text-sky-500 text-[10px] sm:text-xs font-bold uppercase tracking-widest">{product.category} {product.subcategory && `> ${product.subcategory}`}</span>
                </div>
-               <h1 className="text-3xl sm:text-4xl font-bold tracking-tight mb-2">{product.name}</h1>
+               <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight mb-2 leading-tight">{product.name}</h1>
                {product.isLastStock && (
-                 <div className="flex items-center gap-2 mb-4 bg-red-500/10 border border-red-500/20 px-3 py-1.5 rounded-lg w-fit animate-pulse">
-                    <Zap className="w-4 h-4 text-red-500 fill-red-500" />
-                    <span className="text-xs font-bold text-red-500 uppercase tracking-widest">Hurry! Last inventory items remaining</span>
+                 <div className="flex items-center gap-2 mb-4 bg-red-500/10 border border-red-500/20 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg w-fit animate-pulse">
+                    <Zap className="w-3.5 h-3.5 text-red-500 fill-red-500" />
+                    <span className="text-[10px] sm:text-xs font-bold text-red-500 uppercase tracking-widest leading-none">Last inventory items remaining</span>
                  </div>
                )}
-               <div className="flex items-center gap-2 mb-6">
-                   <div className="flex text-yellow-400 text-sm">
+               <div className="flex items-center gap-2 mb-4 sm:mb-6">
+                   <div className="flex text-yellow-400 text-xs sm:text-sm">
                        {product.rating ? ('★'.repeat(Math.round(product.rating)) + '☆'.repeat(5 - Math.round(product.rating))) : '★★★★★'}
                    </div>
-                   <span className="text-sm text-sky-400 hover:text-sky-300 font-medium cursor-pointer transition-colors" onClick={() => document.getElementById('reviews-section')?.scrollIntoView({ behavior: 'smooth' })}>
+                   <span className="text-xs sm:text-sm text-sky-400 hover:text-sky-300 font-medium cursor-pointer transition-colors" onClick={() => document.getElementById('reviews-section')?.scrollIntoView({ behavior: 'smooth' })}>
                      {product.reviewsCount || 0} reviews
                    </span>
                </div>
-               <div className="text-3xl font-mono text-sky-400 font-bold tracking-tighter mb-6">{formatPHP(activePrice)}</div>
+               <div className="text-2xl sm:text-3xl font-mono text-sky-400 font-bold tracking-tighter mb-4 sm:mb-6">{formatPHP(activePrice)}</div>
                
-               <p className="text-slate-300 text-sm leading-relaxed mb-8 text-justify">{product.description}</p>
+               <p className="text-slate-300 text-xs sm:text-sm leading-relaxed mb-6 sm:mb-8">{product.description}</p>
                
                {product.variations && product.variations.length > 0 && (
-                 <div className="mb-8">
-                    <h4 className="text-sm font-bold uppercase tracking-wider mb-3 text-slate-400">Select Variation</h4>
-                    <div className="flex flex-wrap gap-3">
+                 <div className="mb-6 sm:mb-8">
+                    <h4 className="text-[10px] sm:text-xs font-bold uppercase tracking-wider mb-2 sm:mb-3 text-slate-500">Select Variation</h4>
+                    <div className="flex flex-wrap gap-2 sm:gap-3">
                        {product.variations.map(variant => (
                          <button 
                            key={variant.id}
                            onClick={() => setSelectedVariant(variant)}
-                           className={`px-4 py-2 border rounded-lg text-sm font-medium transition-all ${selectedVariant?.id === variant.id ? 'border-sky-500 bg-sky-500/10 text-sky-400' : 'border-white/10 text-slate-300 hover:border-white/30 hover:bg-white/5'}`}
+                           className={`px-3 sm:px-4 py-2 border rounded-lg text-xs sm:text-sm font-bold transition-all ${selectedVariant?.id === variant.id ? 'border-sky-500 bg-sky-500/10 text-sky-400' : 'border-white/10 text-slate-300 hover:border-white/30 hover:bg-white/5'}`}
                          >
                             {variant.name}
                          </button>
@@ -1063,12 +1063,12 @@ function ProductView({ product, onAddToCart, onBack }: { product: Product, onAdd
                  </div>
                )}
 
-               <div className="mt-auto pt-8 border-t border-white/10">
+               <div className="mt-auto pt-6 sm:pt-8 border-t border-white/10">
                  <button 
                    onClick={() => onAddToCart(product, selectedVariant)}
-                   className="w-full bg-sky-500 hover:bg-sky-400 text-black font-extrabold py-4 rounded-xl transition-all flex items-center justify-center gap-2 uppercase tracking-wide shadow-lg shadow-sky-500/20"
+                   className="w-full bg-sky-500 hover:bg-sky-400 text-black font-extrabold py-3.5 sm:py-4 rounded-xl transition-all flex items-center justify-center gap-2 uppercase tracking-widest text-xs sm:text-sm shadow-lg shadow-sky-500/20"
                  >
-                   <ShoppingCart className="w-5 h-5" /> Add to Cart
+                   <ShoppingCart className="w-5 h-5 shrink-0" /> Add to Cart
                  </button>
                </div>
            </div>
@@ -1344,6 +1344,21 @@ function AdminDashboard({ onOpenChat }: { onOpenChat: (id: string) => void }) {
                            >
                               Cancel <Trash2 className="w-3 h-3" />
                            </button>
+                           <button 
+                             onClick={async () => {
+                               if (!window.confirm('PERMANENT DELETE: Are you sure you want to delete this order document?')) return;
+                               try {
+                                 await deleteDoc(doc(db, 'orders', order.id));
+                                 alert('Order deleted successfully');
+                               } catch (err) {
+                                 console.error('Error deleting order:', err);
+                                 alert('Failed to delete order.');
+                               }
+                             }}
+                             className="text-xs font-bold text-orange-500 hover:text-white uppercase tracking-widest transition-colors flex items-center gap-2"
+                           >
+                              Delete <Trash2 className="w-3 h-3" />
+                           </button>
                            <button className="text-xs font-bold text-sky-500 hover:text-white uppercase tracking-widest transition-colors flex items-center gap-2">
                               Update Status <ArrowRight className="w-3 h-3" />
                            </button>
@@ -1394,6 +1409,7 @@ function AdminChatView({ chatId, onBack, pendingOrder, onClearPending }: { chatI
   const [messages, setMessages] = useState<any[]>([]);
   const [inputText, setInputText] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+  const [zoomImage, setZoomImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const initialized = useRef(false);
@@ -1517,26 +1533,27 @@ function AdminChatView({ chatId, onBack, pendingOrder, onClearPending }: { chatI
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8 flex flex-col h-[calc(100vh-120px)]">
-       <div className="flex items-center justify-between mb-6">
-         <button onClick={onBack} className="flex items-center gap-2 text-slate-400 hover:text-white text-sm"><ChevronLeft className="w-4 h-4" /> Back to Dashboard</button>
+    <div className="max-w-4xl mx-auto px-2 sm:px-4 py-4 sm:py-8 flex flex-col h-[85vh] sm:h-[calc(100vh-120px)]">
+       <div className="flex items-center justify-between mb-4 sm:mb-6">
+         <button onClick={onBack} className="flex items-center gap-2 text-slate-400 hover:text-white text-xs sm:text-sm"><ChevronLeft className="w-4 h-4" /> Back to Dashboard</button>
          <button 
            onClick={endConversation}
-           className="flex items-center gap-2 px-4 py-2 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all border border-red-500/20"
+           className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all border border-red-500/20"
          >
            <Trash2 className="w-3.5 h-3.5" />
-           End Conversation
+           <span className="hidden sm:inline">End Conversation</span>
+           <span className="sm:hidden">End Chat</span>
          </button>
        </div>
-       <div className="flex-1 bg-bg-card border border-white/10 rounded-3xl overflow-hidden flex flex-col shadow-2xl">
-          <div className="p-4 bg-black/40 border-b border-white/5 flex items-center justify-between">
-             <div className="flex items-center gap-3">
+       <div className="flex-1 bg-bg-card border border-white/10 rounded-2xl sm:rounded-3xl overflow-hidden flex flex-col shadow-2xl">
+          <div className="p-3 sm:p-4 bg-black/40 border-b border-white/5 flex items-center justify-between">
+             <div className="flex items-center gap-2 sm:gap-3">
                 <div className="w-8 h-8 rounded-full bg-sky-500/20 flex items-center justify-center font-bold text-sky-400">?</div>
-                <span className="font-bold text-sm">Customer Support Chat</span>
+                <span className="font-bold text-xs sm:text-sm">Customer Support Chat</span>
              </div>
              <span className="text-[10px] text-slate-500 uppercase font-bold px-2 py-1 bg-white/5 rounded">Live Thread</span>
           </div>
-          <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 custom-scrollbar">
              {pendingOrder && (
                <div className="mx-auto max-w-sm mb-6 bg-sky-500/10 border border-sky-500/30 rounded-2xl p-4 shadow-xl">
                  <div className="flex items-start gap-4 mb-3 border-b border-sky-500/20 pb-4">
@@ -1608,28 +1625,29 @@ function AdminChatView({ chatId, onBack, pendingOrder, onClearPending }: { chatI
                <div key={m.id} className={`flex ${m.senderId === 'system' ? 'justify-center w-full my-4' : (m.senderId === auth.currentUser?.uid ? 'justify-end' : 'justify-start')}`}>
                   <div className={`
                     ${m.senderId === 'system' 
-                      ? 'max-w-[90%] bg-sky-500/10 border border-sky-500/20 text-sky-400 p-4 text-center rounded-xl' 
+                      ? 'max-w-[90%] bg-sky-500/10 border border-sky-500/20 text-sky-400 p-3 sm:p-4 text-center rounded-xl' 
                       : (m.senderId === auth.currentUser?.uid 
-                        ? 'max-w-[80%] bg-sky-500 text-black font-medium p-4 rounded-2xl shadow-lg' 
-                        : 'max-w-[80%] bg-white/5 text-slate-300 border border-white/5 p-4 rounded-2xl')}
-                    text-sm relative overflow-hidden
+                        ? 'max-w-[85%] bg-sky-500 text-black font-medium p-3 sm:p-4 rounded-2xl shadow-lg' 
+                        : 'max-w-[85%] bg-white/5 text-slate-300 border border-white/5 p-3 sm:p-4 rounded-2xl')}
+                    text-xs sm:text-sm relative overflow-hidden
                   `}>
                      {m.imageUrl && (
                        <img 
                          src={m.imageUrl} 
                          alt="Uploaded Content" 
-                         className="w-full max-h-60 object-cover rounded-lg mb-2 shadow-sm border border-white/10" 
+                         onClick={() => setZoomImage(m.imageUrl)}
+                         className="w-full max-h-60 sm:max-h-80 object-cover rounded-lg mb-2 shadow-sm border border-white/5 cursor-zoom-in hover:opacity-90 transition-opacity" 
                          referrerPolicy="no-referrer"
                        />
                      )}
-                     {m.text && <p className="whitespace-pre-line">{m.text}</p>}
-                     {m.senderId === 'system' && <div className="absolute top-0 right-0 p-1 opacity-20"><Zap className="w-12 h-12" /></div>}
+                     {m.text && <p className="whitespace-pre-line leading-relaxed">{m.text}</p>}
+                     {m.senderId === 'system' && <div className="absolute top-0 right-0 p-1 opacity-20"><Zap className="w-10 h-10 sm:w-12 sm:h-12" /></div>}
                   </div>
                </div>
              ))}
              <div ref={scrollRef} />
           </div>
-          <form onSubmit={sendMessage} className="p-4 bg-black/40 border-t border-white/5 flex gap-2">
+          <form onSubmit={sendMessage} className="p-3 sm:p-4 bg-black/40 border-t border-white/5 flex gap-2">
              <input 
                type="file" 
                accept="image/*" 
@@ -1641,27 +1659,51 @@ function AdminChatView({ chatId, onBack, pendingOrder, onClearPending }: { chatI
                type="button" 
                onClick={() => fileInputRef.current?.click()}
                disabled={isUploading}
-               className="p-3 bg-white/5 text-slate-400 rounded-xl hover:text-white transition-colors flex items-center justify-center relative overflow-hidden"
+               className="p-2 sm:p-3 bg-white/5 text-slate-400 rounded-xl hover:text-white transition-colors flex items-center justify-center shrink-0"
                title="Upload Photo (Max 2MB)"
              >
                 {isUploading ? (
                   <div className="w-5 h-5 border-2 border-sky-500 border-t-transparent rounded-full animate-spin"></div>
                 ) : (
-                  <ImageIcon className="w-5 h-5" />
+                  <ImageIcon className="w-4 h-4 sm:w-5 h-5" />
                 )}
              </button>
              <input 
                type="text" 
                value={inputText}
                onChange={(e) => setInputText(e.target.value)}
-               placeholder="Type a message..." 
-               className="flex-1 bg-bg-surface border border-white/10 rounded-xl px-4 py-3 outline-none focus:border-sky-500"
+               placeholder="Write message..." 
+               className="flex-1 min-w-0 bg-bg-surface border border-white/10 rounded-xl px-3 sm:px-4 py-2.5 sm:py-3 text-[13px] sm:text-sm outline-none focus:border-sky-500"
              />
-             <button type="submit" className="p-3 bg-sky-500 text-black rounded-xl hover:bg-sky-400 transition-colors">
-                <Send className="w-5 h-5" />
+             <button type="submit" className="p-2.5 sm:p-3 bg-sky-500 text-black rounded-xl hover:bg-sky-400 transition-colors shrink-0">
+                <Send className="w-4 h-4 sm:w-5 h-5" />
              </button>
           </form>
        </div>
+
+       <AnimatePresence>
+         {zoomImage && (
+           <motion.div 
+             initial={{ opacity: 0 }}
+             animate={{ opacity: 1 }}
+             exit={{ opacity: 0 }}
+             onClick={() => setZoomImage(null)}
+             className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-2xl flex items-center justify-center p-2 sm:p-4 cursor-zoom-out"
+           >
+              <motion.img 
+                initial={{ scale: 0.9 }}
+                animate={{ scale: 1 }}
+                exit={{ scale: 0.9 }}
+                src={zoomImage} 
+                className="max-w-full max-h-full object-contain rounded-xl sm:rounded-3xl shadow-2xl" 
+                alt=""
+              />
+              <button className="absolute top-6 right-6 p-2 bg-white/10 hover:bg-white/20 rounded-full transition-colors flex items-center justify-center">
+                <X className="w-6 h-6 text-white" />
+              </button>
+           </motion.div>
+         )}
+       </AnimatePresence>
     </div>
   );
 }
@@ -1781,38 +1823,35 @@ function UserDashboardView({ user, profile, onSignOut, onNavigate, unreadCount }
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-12">
+       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 sm:gap-8">
           {/* Sidebar */}
           <div className="lg:col-span-1 space-y-4">
-             <div className="bg-bg-card border border-white/5 rounded-3xl p-6 mb-8 text-center">
-                <div className="w-20 h-20 mx-auto rounded-full border-4 border-sky-500/20 p-1 mb-4">
+             <div className="bg-bg-card border border-white/5 rounded-3xl p-6 text-center">
+                <div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto rounded-full border-4 border-sky-500/20 p-1 mb-4 shrink-0">
                    <img src={user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName || user.email}&background=0ea5e9&color=fff`} className="w-full h-full rounded-full object-cover" />
                 </div>
-                <h3 className="font-bold text-lg leading-tight mb-1">{profile?.displayName || user.displayName || 'Hardware Enthusiast'}</h3>
-                <p className="text-[10px] text-sky-500 font-bold uppercase tracking-widest">{user.emailVerified ? 'Verified Account' : 'Unverified Email'}</p>
-                {!user.emailVerified && (
-                  <button onClick={() => sendEmailVerification(user)} className="mt-2 text-[10px] text-slate-500 hover:text-sky-400">Resend Verification</button>
-                )}
+                <h3 className="font-bold text-base sm:text-lg leading-tight mb-1 truncate">{profile?.displayName || user.displayName || 'User'}</h3>
+                <p className="text-[10px] text-sky-500 font-bold uppercase tracking-widest leading-none">{user.emailVerified ? 'Verified' : 'Unverified'}</p>
              </div>
 
-             <div className="bg-bg-card border border-white/5 rounded-3xl overflow-hidden p-2 space-y-1">
-                <button onClick={() => setActiveTab('orders')} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl text-xs font-bold transition-all ${activeTab === 'orders' ? 'bg-sky-500 text-black' : 'hover:bg-white/5 text-slate-400'}`}>
-                   <History className="w-4 h-4" /> My Orders
+             <div className="bg-bg-card border border-white/5 rounded-2xl sm:rounded-3xl p-2 flex lg:flex-col gap-1 overflow-x-auto lg:overflow-visible no-scrollbar">
+                <button onClick={() => setActiveTab('orders')} className={`whitespace-nowrap flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3.5 rounded-xl sm:rounded-2xl text-[11px] sm:text-xs font-bold transition-all ${activeTab === 'orders' ? 'bg-sky-500 text-black' : 'hover:bg-white/5 text-slate-400'}`}>
+                   <History className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Orders
                 </button>
-                <button onClick={() => setActiveTab('profile')} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl text-xs font-bold transition-all ${activeTab === 'profile' ? 'bg-sky-500 text-black' : 'hover:bg-white/5 text-slate-400'}`}>
-                   <User className="w-4 h-4" /> My Profile
+                <button onClick={() => setActiveTab('profile')} className={`whitespace-nowrap flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3.5 rounded-xl sm:rounded-2xl text-[11px] sm:text-xs font-bold transition-all ${activeTab === 'profile' ? 'bg-sky-500 text-black' : 'hover:bg-white/5 text-slate-400'}`}>
+                   <User className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Profile
                 </button>
-                <button onClick={() => setActiveTab('chat')} className={`w-full flex items-center justify-between px-4 py-3.5 rounded-2xl text-xs font-bold transition-all ${activeTab === 'chat' ? 'bg-sky-500 text-black' : 'hover:bg-white/5 text-slate-400'}`}>
-                   <div className="flex items-center gap-3">
-                      <MessageSquare className="w-4 h-4" /> Live Support
+                <button onClick={() => setActiveTab('chat')} className={`whitespace-nowrap flex items-center justify-between gap-4 px-3 sm:px-4 py-2.5 sm:py-3.5 rounded-xl sm:rounded-2xl text-[11px] sm:text-xs font-bold transition-all ${activeTab === 'chat' ? 'bg-sky-500 text-black' : 'hover:bg-white/5 text-slate-400'}`}>
+                   <div className="flex items-center gap-2 sm:gap-3">
+                      <MessageSquare className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Support
                    </div>
-                   {unreadCount > 0 && <span className="bg-red-500 text-white text-[8px] px-1.5 py-0.5 rounded-full animate-bounce">NEW</span>}
+                   {unreadCount > 0 && <span className="bg-red-500 text-white text-[8px] px-1.5 py-0.5 rounded-full animate-bounce shrink-0">NEW</span>}
                 </button>
-                <button onClick={() => onNavigate('tracking')} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl text-xs font-bold transition-all hover:bg-white/5 text-slate-400`}>
-                   <Search className="w-4 h-4" /> Track Order
+                <button onClick={handleSignOut} className="lg:hidden whitespace-nowrap flex items-center gap-2 px-3 py-2.5 rounded-xl text-[11px] font-bold text-red-500 bg-red-500/5 transition-all">
+                   <LogOut className="w-3.5 h-3.5" /> Out
                 </button>
-                <button onClick={handleSignOut} className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl text-xs font-bold text-red-500 hover:bg-red-500/10 transition-all border-t border-white/5 mt-4">
+                <button onClick={handleSignOut} className="hidden lg:flex items-center gap-3 px-4 py-3.5 rounded-2xl text-xs font-bold text-red-500 hover:bg-red-500/10 transition-all border-t border-white/5 mt-4">
                    <LogOut className="w-4 h-4" /> Sign Out
                 </button>
              </div>
@@ -2026,9 +2065,9 @@ function TrackingView() {
        )}
 
        <div className="w-full rounded-3xl overflow-hidden border border-white/10 bg-black/40 h-[400px] shadow-2xl">
-          {/* User provided link: https://maps.app.goo.gl/Cncx8rtiiKQYqVDe7 */}
+          {/* User provided link: https://maps.app.goo.gl/1VvRidEFBkwzq8Th6 */}
           <iframe 
-            src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3861.1278153434676!2d121.0425268!3d14.5912836!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3397c83f124c9c7f%3A0xe54e6015dd394d1f!2sCyberzone%20SM%20Megamall!5e0!3m2!1sen!2sph!4v1714652000000!5m2!1sen!2sph"
+            src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3860.672321453267!2d121.0116817!3d14.61719!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3397b7af9102ca17%3A0xc07c70ae83f1469e!2sPC%20Bodega!5e0!3m2!1sen!2sph!4v1714652000000!5m2!1sen!2sph"
             width="100%" 
             height="100%" 
             style={{ border: 0 }} 
@@ -2037,7 +2076,7 @@ function TrackingView() {
             referrerPolicy="no-referrer-when-downgrade"
           />
        </div>
-       <p className="mt-4 text-[10px] text-slate-600 uppercase font-black tracking-widest">Live Rider Tracking Enabled • SM Megamall Central Hub</p>
+       <p className="mt-4 text-[10px] text-slate-600 uppercase font-black tracking-widest">Live Rider Tracking Enabled • PC Bodega Warehouse Distribution Hub</p>
     </div>
   );
 }
@@ -2081,22 +2120,22 @@ function CheckoutView({ cart, subtotal, discount, appliedVoucher, setAppliedVouc
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
-      <button onClick={onBack} className="flex items-center gap-2 text-slate-400 hover:text-white mb-8 text-sm"><ChevronLeft className="w-4 h-4" /> Back to Shopping</button>
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
-        <div className="lg:col-span-7 space-y-10">
+    <div className="max-w-6xl mx-auto px-3 sm:px-6 py-6 sm:py-12">
+      <button onClick={onBack} className="flex items-center gap-2 text-slate-400 hover:text-white mb-6 sm:mb-8 text-xs sm:text-sm font-bold uppercase tracking-widest"><ChevronLeft className="w-4 h-4" /> Back to Store</button>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-12">
+        <div className="lg:col-span-7 space-y-8 sm:space-y-10">
           <section>
-            <h2 className="text-xl font-bold uppercase mb-6 pb-4 border-b border-white/10">Review Order</h2>
+            <h2 className="text-lg sm:text-xl font-bold uppercase mb-4 sm:mb-6 pb-4 border-b border-white/10 tracking-widest">Review Items</h2>
             <div className="space-y-3">
               {cart.map((item: CartItem) => (
-                <div key={item.id} className="flex gap-4 items-center bg-bg-card p-4 rounded-xl border border-white/5">
-                   <img src={item.product.image} className="w-16 h-16 rounded-lg object-cover border border-white/5" />
-                   <div className="flex-1">
-                      <h4 className="font-medium text-sm leading-tight">{item.product.name}</h4>
-                      {item.selectedVariant && <p className="text-[10px] text-sky-400 mt-0.5">{item.selectedVariant.name}</p>}
-                      <p className="text-slate-500 text-xs mt-1">Qty: {item.quantity}</p>
+                <div key={item.id} className="flex gap-3 sm:gap-4 items-center bg-bg-card p-3 sm:p-4 rounded-xl border border-white/5 shadow-lg">
+                   <img src={item.product.image} className="w-12 h-12 sm:w-16 sm:h-16 rounded-lg object-cover border border-white/5 shrink-0" />
+                   <div className="flex-1 min-w-0">
+                      <h4 className="font-bold text-xs sm:text-sm leading-tight truncate">{item.product.name}</h4>
+                      {item.selectedVariant && <p className="text-[9px] sm:text-[10px] text-sky-400 mt-0.5 font-bold uppercase">{item.selectedVariant.name}</p>}
+                      <p className="text-slate-500 text-[10px] sm:text-xs mt-1">Qty: {item.quantity}</p>
                    </div>
-                   <div className="font-mono font-bold text-[15px] text-sky-400 tracking-tight">
+                   <div className="font-mono font-bold text-sm sm:text-[15px] text-sky-400 tracking-tight shrink-0">
                       {formatPHP((item.selectedVariant ? item.selectedVariant.price : item.product.price) * item.quantity)}
                    </div>
                 </div>
@@ -2105,33 +2144,33 @@ function CheckoutView({ cart, subtotal, discount, appliedVoucher, setAppliedVouc
           </section>
 
           <section>
-            <h2 className="text-xl font-bold uppercase mb-6 pb-4 border-b border-white/10">Delivery Details</h2>
-            <form id="checkout-form" onSubmit={onProceed} className="space-y-5">
+            <h2 className="text-lg sm:text-xl font-bold uppercase mb-4 sm:mb-6 pb-4 border-b border-white/10 tracking-widest">Delivery</h2>
+            <form id="checkout-form" onSubmit={onProceed} className="space-y-4 sm:space-y-5">
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-slate-400 uppercase tracking-wider">Complete Name</label>
-                <input required type="text" className="w-full bg-bg-surface border border-white/10 text-sm rounded-lg px-4 py-3 outline-none focus:border-sky-500" value={checkoutData.name} onChange={(e) => setCheckoutData({...checkoutData, name: e.target.value})} />
+                <label className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-widest px-1">Complete Name</label>
+                <input required type="text" className="w-full bg-bg-card border border-white/10 text-sm rounded-xl px-4 py-3 sm:py-3.5 outline-none focus:border-sky-500 transition-all shadow-xl" value={checkoutData.name} onChange={(e) => setCheckoutData({...checkoutData, name: e.target.value})} />
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-slate-400 uppercase">Email Address</label>
-                  <input required type="email" className="w-full bg-bg-surface border border-white/10 text-sm rounded-lg px-4 py-3 outline-none focus:border-sky-500" value={checkoutData.email} onChange={(e) => setCheckoutData({...checkoutData, email: e.target.value})} />
+                  <label className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-widest px-1">Email Address</label>
+                  <input required type="email" className="w-full bg-bg-card border border-white/10 text-sm rounded-xl px-4 py-3 sm:py-3.5 outline-none focus:border-sky-500 transition-all shadow-xl" value={checkoutData.email} onChange={(e) => setCheckoutData({...checkoutData, email: e.target.value})} />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-slate-400 uppercase">Mobile Number</label>
-                  <input required type="tel" className="w-full bg-bg-surface border border-white/10 text-sm rounded-lg px-4 py-3 outline-none focus:border-sky-500" value={checkoutData.phone} onChange={(e) => setCheckoutData({...checkoutData, phone: e.target.value})} />
+                  <label className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-widest px-1">Mobile Number</label>
+                  <input required type="tel" className="w-full bg-bg-card border border-white/10 text-sm rounded-xl px-4 py-3 sm:py-3.5 outline-none focus:border-sky-500 transition-all shadow-xl" value={checkoutData.phone} onChange={(e) => setCheckoutData({...checkoutData, phone: e.target.value})} />
                 </div>
               </div>
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-slate-400 uppercase tracking-wider">Complete Delivery Address</label>
-                <textarea required rows={3} className="w-full bg-bg-surface border border-white/10 text-sm rounded-lg px-4 py-3 outline-none focus:border-sky-500 resize-none" placeholder="Unit/House No., Street, Barangay, City, Province, Zip Code" value={checkoutData.address} onChange={(e) => setCheckoutData({...checkoutData, address: e.target.value})} />
+                <label className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-widest px-1">Delivery Address</label>
+                <textarea required rows={3} className="w-full bg-bg-card border border-white/10 text-sm rounded-xl px-4 py-3 sm:py-3.5 outline-none focus:border-sky-500 resize-none transition-all shadow-xl" placeholder="Full address details..." value={checkoutData.address} onChange={(e) => setCheckoutData({...checkoutData, address: e.target.value})} />
               </div>
             </form>
           </section>
         </div>
 
         <div className="lg:col-span-5">
-           <div className="bg-bg-surface border border-white/10 rounded-2xl p-8 sticky top-24 shadow-2xl">
-              <h3 className="text-lg font-bold uppercase mb-6 flex items-center gap-2 tracking-wider">Order Summary</h3>
+           <div className="bg-bg-card border border-white/10 rounded-2xl sm:rounded-3xl p-5 sm:p-8 sticky top-24 shadow-2xl">
+              <h3 className="text-base sm:text-lg font-bold uppercase mb-4 sm:mb-6 flex items-center gap-2 tracking-widest italic text-sky-400">Order Summary</h3>
 
               {/* Voucher Section */}
               <div className="mb-6 bg-black/20 p-4 rounded-xl border border-white/5">
@@ -2141,13 +2180,13 @@ function CheckoutView({ cart, subtotal, discount, appliedVoucher, setAppliedVouc
                     type="text" 
                     value={voucherInput} 
                     onChange={(e) => setVoucherInput(e.target.value)}
-                    className="flex-1 bg-black/40 border border-white/10 text-xs rounded-lg px-3 py-2 outline-none focus:border-sky-500 font-mono text-white" 
+                    className="flex-1 bg-bg-surface border border-white/10 text-xs rounded-lg px-3 py-2.5 outline-none focus:border-sky-500 font-mono text-white" 
                     placeholder="Enter code" 
                   />
                   <button 
                     type="button"
                     onClick={handleApplyVoucher}
-                    className="bg-sky-500 hover:bg-sky-400 text-black text-[10px] px-3 rounded-lg font-extrabold transition-all uppercase"
+                    className="bg-sky-500 hover:bg-sky-400 text-black text-[10px] px-4 rounded-lg font-black transition-all uppercase shadow-lg shadow-sky-500/20"
                   >
                     Apply
                   </button>

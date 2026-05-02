@@ -24,6 +24,7 @@ service cloud.firestore {
       allow create: if true;
       allow read: if true; // Just allow reading for now to ensure tracking works
       allow update: if true; // Simplify update for payment proofs
+      allow delete: if isAdmin();
     }
 
     // Chats: Allow read/write if admin or if it's the user's own chat
