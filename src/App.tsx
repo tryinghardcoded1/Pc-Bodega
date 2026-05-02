@@ -21,7 +21,9 @@ import {
   Star,
   Play,
   ShoppingBag,
-  Truck
+  Truck,
+  Image as ImageIcon,
+  Camera
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { initializeApp } from 'firebase/app';
@@ -334,6 +336,8 @@ export default function App() {
           } else {
             setUnreadCount(0);
           }
+        }, (err) => {
+          handleFirestoreError(err, OperationType.GET, 'chats');
         });
         
         // Bootstrap admin record in Firestore if they are a designated admin
@@ -433,12 +437,28 @@ export default function App() {
       if (currentUser) {
         const chatPath = `chats`;
         const chatId = currentUser.uid;
-        await setDoc(doc(db, chatPath, chatId), {
-          userId: currentUser.uid,
-          userName: currentUser.displayName || checkoutData.name,
-          lastMessage: `New Order: ${trackingNumber} (${formatPHP(cartSubtotal - cartDiscount + DELIVERY_FEE)})`,
-          updatedAt: serverTimestamp()
-        }, { merge: true });
+        
+        // Auto-send the order notification
+        const summaryText = `📦 NEW ORDER: ${trackingNumber}\nTotal: ${formatPHP(cartSubtotal - cartDiscount + DELIVERY_FEE)}\nStatus: Pending Payment\n\nPlease send your proof of payment here.`;
+        
+        try {
+          await setDoc(doc(db, chatPath, chatId), {
+            userId: currentUser.uid,
+            userName: currentUser.displayName || checkoutData.name,
+            lastMessage: `New Order: ${trackingNumber}`,
+            updatedAt: serverTimestamp(),
+            hasAdminUnread: true
+          }, { merge: true });
+
+          await addDoc(collection(db, chatPath, chatId, 'messages'), {
+            text: summaryText,
+            senderId: 'system', // or currentUser.uid
+            createdAt: serverTimestamp(),
+            isOrderSummary: true
+          });
+        } catch (e) {
+          console.error("Error creating chat", e);
+        }
 
         // Instant chat box appearance as requested
         setSelectedChatId(currentUser.uid);
@@ -1194,6 +1214,8 @@ function AdminDashboard({ onOpenChat }: { onOpenChat: (id: string) => void }) {
     const qOrders = query(collection(db, 'orders'), orderBy('createdAt', 'desc'));
     const unsubOrders = onSnapshot(qOrders, (snapshot) => {
       setOrders(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (err) => {
+      handleFirestoreError(err, OperationType.GET, 'orders');
     });
 
     const qChats = query(collection(db, 'chats'), orderBy('updatedAt', 'desc'));
@@ -1201,7 +1223,7 @@ function AdminDashboard({ onOpenChat }: { onOpenChat: (id: string) => void }) {
       setChats(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       setLoading(false);
     }, (err) => {
-      console.error(err);
+      handleFirestoreError(err, OperationType.GET, 'chats');
       setLoading(false);
     });
 
@@ -1364,14 +1386,18 @@ function AdminChatView({ chatId, onBack, pendingOrder, onClearPending }: { chatI
       
       setMessages(newMessages);
       initialized.current = true;
+    }, (err) => {
+      handleFirestoreError(err, OperationType.GET, `chats/${chatId}/messages`);
     });
 
     // Mark as read when opening
     const markAsRead = async () => {
       try {
         const isUserAdmin = auth.currentUser?.email === 'paoloesteban75@gmail.com' || auth.currentUser?.email === 'akolangpo@pcbodega.com';
+        // Get existing chat data to preserve fields or just rely on merge + updatedAt
         await setDoc(doc(db, 'chats', chatId), {
-          [isUserAdmin ? 'hasAdminUnread' : 'hasUserUnread']: false
+          [isUserAdmin ? 'hasAdminUnread' : 'hasUserUnread']: false,
+          updatedAt: serverTimestamp()
         }, { merge: true });
       } catch (e) {
         console.error(e);
@@ -1528,8 +1554,15 @@ function AdminChatView({ chatId, onBack, pendingOrder, onClearPending }: { chatI
              )}
 
              {messages.map((m) => (
-               <div key={m.id} className={`flex ${m.senderId === auth.currentUser?.uid ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[80%] p-4 rounded-2xl text-sm ${m.senderId === auth.currentUser?.uid ? 'bg-sky-500 text-black font-medium' : 'bg-white/5 text-slate-300 border border-white/5'}`}>
+               <div key={m.id} className={`flex ${m.senderId === 'system' ? 'justify-center w-full my-4' : (m.senderId === auth.currentUser?.uid ? 'justify-end' : 'justify-start')}`}>
+                  <div className={`
+                    ${m.senderId === 'system' 
+                      ? 'max-w-[90%] bg-sky-500/10 border border-sky-500/20 text-sky-400 p-4 text-center rounded-xl' 
+                      : (m.senderId === auth.currentUser?.uid 
+                        ? 'max-w-[80%] bg-sky-500 text-black font-medium p-4 rounded-2xl shadow-lg' 
+                        : 'max-w-[80%] bg-white/5 text-slate-300 border border-white/5 p-4 rounded-2xl')}
+                    text-sm relative overflow-hidden
+                  `}>
                      {m.imageUrl && (
                        <img 
                          src={m.imageUrl} 
@@ -1538,7 +1571,8 @@ function AdminChatView({ chatId, onBack, pendingOrder, onClearPending }: { chatI
                          referrerPolicy="no-referrer"
                        />
                      )}
-                     {m.text && <p>{m.text}</p>}
+                     {m.text && <p className="whitespace-pre-line">{m.text}</p>}
+                     {m.senderId === 'system' && <div className="absolute top-0 right-0 p-1 opacity-20"><Zap className="w-12 h-12" /></div>}
                   </div>
                </div>
              ))}
@@ -1556,9 +1590,14 @@ function AdminChatView({ chatId, onBack, pendingOrder, onClearPending }: { chatI
                type="button" 
                onClick={() => fileInputRef.current?.click()}
                disabled={isUploading}
-               className="p-3 bg-white/5 text-slate-400 rounded-xl hover:text-white transition-colors"
+               className="p-3 bg-white/5 text-slate-400 rounded-xl hover:text-white transition-colors flex items-center justify-center relative overflow-hidden"
+               title="Upload Photo (Max 2MB)"
              >
-                <Plus className={`w-5 h-5 ${isUploading ? 'animate-spin' : ''}`} />
+                {isUploading ? (
+                  <div className="w-5 h-5 border-2 border-sky-500 border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                  <ImageIcon className="w-5 h-5" />
+                )}
              </button>
              <input 
                type="text" 
@@ -1677,6 +1716,9 @@ function UserDashboardView({ user, profile, onSignOut, onNavigate, unreadCount }
     const q = query(collection(db, 'orders'), where('userId', '==', user.uid), orderBy('createdAt', 'desc'));
     const unsub = onSnapshot(q, (snapshot) => {
       setOrders(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setLoading(false);
+    }, (err) => {
+      handleFirestoreError(err, OperationType.GET, 'orders');
       setLoading(false);
     });
     return unsub;
