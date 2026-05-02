@@ -14,13 +14,13 @@ service cloud.firestore {
 
     function isAdmin() {
       return isSignedIn() && (
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
-        request.auth.token.email == 'paoloesteban75@gmail.com'
+        request.auth.token.email == 'paoloesteban75@gmail.com' ||
+        request.auth.token.email == 'akolangpo@pcbodega.com'
       );
     }
 
     function isValidId(id) {
-      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+      return id is string && id.size() <= 128;
     }
 
     function incoming() {
@@ -34,57 +34,56 @@ service cloud.firestore {
     // --- Validation Functions ---
     function isValidOrder(data) {
       return data.keys().hasAll(['name', 'email', 'phone', 'address', 'items', 'total', 'status', 'createdAt', 'trackingNumber']) &&
-             data.keys().size() >= 9 &&
              data.name is string &&
-             data.email is string &&
-             data.trackingNumber is string &&
-             data.status in ['pending', 'processing', 'shipped', 'delivered'] &&
-             data.createdAt == request.time;
+             data.email is string;
     }
 
     function isValidUser(data) {
-      return data.keys().hasAll(['displayName', 'address', 'phone', 'updatedAt']) &&
-             data.displayName is string &&
-             data.updatedAt == request.time;
+      return data.keys().hasAll(['displayName', 'updatedAt']) &&
+             data.displayName is string;
+    }
+
+    function isValidChatThread(data) {
+      return data.keys().hasAll(['userId', 'userName', 'updatedAt']) &&
+             data.userId is string &&
+             data.userName is string;
+    }
+
+    function isValidMessage(data) {
+      return data.keys().hasAll(['text', 'senderId', 'createdAt']) &&
+             data.text is string &&
+             data.senderId == request.auth.uid;
     }
 
     // --- Collection Rules ---
 
     // Users Collection
     match /users/{userId} {
-      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
-      allow write: if isSignedIn() && request.auth.uid == userId && isValidUser(incoming());
+      allow read, write: if isSignedIn() && (request.auth.uid == userId || isAdmin());
     }
 
     // Admins Collection
     match /admins/{adminId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
+      allow read, write: if isSignedIn() && (request.auth.token.email == 'paoloesteban75@gmail.com' || request.auth.token.email == 'akolangpo@pcbodega.com' || isAdmin());
     }
 
     // Orders Collection
     match /orders/{orderId} {
       allow create: if isValidId(orderId) && isValidOrder(incoming());
-      // Allow read if user owns the order OR if searching by tracking number (handled via query restrictions)
       allow read: if isAdmin() || (isSignedIn() && (resource == null || resource.data.userId == request.auth.uid)) || (resource != null && resource.data.trackingNumber != null);
       allow update, delete: if isAdmin();
     }
 
     // Chat Threads
     match /chats/{chatId} {
-      // Users can see and create their own chat thread
-      // Admins can see all threads
-      allow create: if isValidId(chatId) && (incoming().userId == request.auth.uid || isAdmin()) && isValidChatThread(incoming());
-      allow read: if isAdmin() || (isSignedIn() && existing().userId == request.auth.uid);
-      allow update: if (isAdmin() || (isSignedIn() && existing().userId == request.auth.uid)) && isValidChatThread(incoming());
+      allow create: if isValidId(chatId) && (incoming().userId == request.auth.uid || isAdmin());
+      allow read: if isAdmin() || (isSignedIn() && (resource == null || resource.data.userId == request.auth.uid));
+      allow update: if isAdmin() || (isSignedIn() && (resource == null || resource.data.userId == request.auth.uid));
     }
 
     // Chat Messages
     match /chats/{chatId}/messages/{messageId} {
-      // Same logic as thread access
-      allow create: if isValidId(messageId) && isValidMessage(incoming()) && (
-        isAdmin() || (isSignedIn() && get(/databases/$(database)/documents/chats/$(chatId)).data.userId == request.auth.uid)
-      );
+      allow create: if isValidId(messageId) && isValidMessage(incoming());
       allow read: if isAdmin() || (isSignedIn() && get(/databases/$(database)/documents/chats/$(chatId)).data.userId == request.auth.uid);
     }
   }

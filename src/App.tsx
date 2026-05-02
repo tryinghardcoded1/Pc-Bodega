@@ -30,7 +30,7 @@ import {
   User as FirebaseUser,
   signOut
 } from 'firebase/auth';
-import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, doc, setDoc, where, getDocs } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, doc, setDoc, where, getDocs, getDoc } from 'firebase/firestore';
 import { 
   auth, 
   db, 
@@ -294,14 +294,29 @@ export default function App() {
       setUser(currUser);
       if (currUser) {
         // Updated admin check to include the requested credentials pattern
-        setIsAdmin(currUser.email === 'paoloesteban75@gmail.com' || currUser.email === 'akolangpo@pcbodega.com');
+        const isUserAdmin = currUser.email === 'paoloesteban75@gmail.com' || currUser.email === 'akolangpo@pcbodega.com';
+        setIsAdmin(isUserAdmin);
+        
+        // Bootstrap admin record in Firestore if they are a designated admin
+        if (isUserAdmin) {
+          try {
+            await setDoc(doc(db, 'admins', currUser.uid), {
+              email: currUser.email,
+              role: 'admin',
+              updatedAt: serverTimestamp()
+            }, { merge: true });
+          } catch (e) {
+             console.error("Admin bootstrap suppressed", e);
+          }
+        }
         
         // Fetch user profile from Firestore
-        const userDoc = await getDocs(query(collection(db, 'users'), where('__name__', '==', currUser.uid)));
-        if (!userDoc.empty) {
-          setUserProfile(userDoc.docs[0].data());
-          if (userDoc.docs[0].data().address && !checkoutData.address) {
-            setCheckoutData(prev => ({ ...prev, address: userDoc.docs[0].data().address, phone: userDoc.docs[0].data().phone || '' }));
+        const userDoc = await getDoc(doc(db, 'users', currUser.uid));
+        if (userDoc.exists()) {
+          const data = userDoc.data();
+          setUserProfile(data);
+          if (data.address && !checkoutData.address) {
+            setCheckoutData(prev => ({ ...prev, address: data.address, phone: data.phone || '' }));
           }
         }
       } else {
@@ -311,7 +326,6 @@ export default function App() {
     });
 
     const timer = setTimeout(() => setShowPopup(true), 2000);
-
     return () => {
       unsub();
       clearTimeout(timer);
@@ -389,7 +403,7 @@ export default function App() {
         setView('admin_chat');
       }
 
-      alert(`Order placed! Tracking ID: ${trackingNumber}. A support chat has been opened for you.`);
+      alert(`Order placed! Tracking ID: ${trackingNumber}.\n\nYour account has been created!\nTemporary Password: Customer123!\n\nPlease use the chat to coordinate payment with the seller.`);
       setCart([]);
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, 'orders');
@@ -1355,24 +1369,23 @@ function AuthView({ onAuthSuccess }: { onAuthSuccess: () => void }) {
     setError('');
     setLoading(true);
 
-    let loginEmail = email;
-    // Handle admin username mapping
+    let finalEmail = email;
+    // Map username to email for both login and registration to ensure it works
     if (email.toLowerCase() === 'akolangpo') {
-      loginEmail = 'akolangpo@pcbodega.com';
+      finalEmail = 'akolangpo@pcbodega.com';
     }
 
     try {
       if (isLogin) {
-        await signInWithEmailAndPassword(auth, loginEmail, password);
+        await signInWithEmailAndPassword(auth, finalEmail, password);
       } else {
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        await updateProfile(userCredential.user, { displayName: name });
-        // Removed email verification requirement as requested
+        const userCredential = await createUserWithEmailAndPassword(auth, finalEmail, password);
+        await updateProfile(userCredential.user, { displayName: name || 'Admin' });
         
         // Initial profile creation
         await setDoc(doc(db, 'users', userCredential.user.uid), {
-          displayName: name,
-          email: email,
+          displayName: name || 'Admin',
+          email: finalEmail,
           address: '',
           phone: '',
           updatedAt: serverTimestamp()
@@ -1400,8 +1413,8 @@ function AuthView({ onAuthSuccess }: { onAuthSuccess: () => void }) {
             </div>
           )}
           <div className="space-y-1.5">
-             <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">Email Address</label>
-             <input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-bg-card border border-white/5 rounded-xl px-4 py-3.5 focus:border-sky-500 outline-none transition-all" placeholder="name@example.com" />
+             <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">Email or Username</label>
+             <input required type="text" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-bg-card border border-white/5 rounded-xl px-4 py-3.5 focus:border-sky-500 outline-none transition-all" placeholder={isLogin ? "akolangpo or name@example.com" : "name@example.com"} />
           </div>
           <div className="space-y-1.5">
              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">Password</label>
