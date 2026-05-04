@@ -13,7 +13,7 @@
 
 @layer base {
   body {
-    @apply bg-bg-base text-slate-100 antialiased font-sans flex flex-col min-h-screen selection:bg-sky-500/30;
+    @apply bg-bg-base text-white antialiased font-sans flex flex-col min-h-screen selection:bg-sky-500/30;
   }
   
   h1, h2, h3, h4, h5, h6 {

@@ -26,7 +26,10 @@ import {
   Truck,
   Image as ImageIcon,
   Trash2,
-  Camera
+  Camera,
+  Copy,
+  Check,
+  Pencil
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { initializeApp } from 'firebase/app';
@@ -78,6 +81,7 @@ type Product = {
   rating?: number;
   reviewsCount?: number;
   isLastStock?: boolean;
+  isSoldOut?: boolean;
   variations?: ProductVariant[];
   reviews?: Review[];
 };
@@ -113,20 +117,16 @@ const WAREHOUSE_IMAGES = [
 
 const PRODUCTS: Product[] = [
   {
-    id: 'p6',
-    name: 'Samsung T7 Portable SSD',
+    id: 'p6_1tb',
+    name: 'Samsung T7 Shield Portable SSD 1TB',
     price: 2990,
     category: 'SSD',
     subcategory: 'PORTABLE',
     rating: 5.0,
     reviewsCount: 10,
     isLastStock: true,
-    description: 'Light, pocket-sized Portable SSD T7 delivers fast speeds with easy and reliable data storage for transferring large files. Transfer massive files within seconds with the incredible speed of USB 3.2 Gen 2. Shock-resistant aluminum casing provides rugged durability alongside its sleek, modern aesthetic. High performance for work and play.',
+    description: 'Light, pocket-sized Portable SSD T7 Shield delivers fast speeds with easy and reliable data storage for transferring large files. IP65 rated for water and dust resistance, this rugged drive is built to withstand drops of up to 3 meters. Features a rubberized outer shell for extra grip and protection.',
     image: 'https://i.imgur.com/6ApxjHs.jpg',
-    variations: [
-      { id: 'v1', name: '1 Terabyte', price: 2990 },
-      { id: 'v2', name: '2 Terabyte', price: 3790 }
-    ],
     reviews: [
       {
         id: 'r_t7_1',
@@ -145,6 +145,18 @@ const PRODUCTS: Product[] = [
         helpfulCount: 8
       }
     ]
+  },
+  {
+    id: 'p6_2tb',
+    name: 'Samsung T7 Shield Portable SSD 2TB',
+    price: 3790,
+    category: 'SSD',
+    subcategory: 'PORTABLE',
+    rating: 5.0,
+    reviewsCount: 4,
+    isSoldOut: true,
+    description: 'Massive 2TB rugged storage. The T7 Shield provides professional-grade durability with IP65 water and dust resistance. Its rubberized exterior and advanced thermal management ensure consistent performance even in challenging environments. Perfect for outdoor shoots or heavy workstation backups.',
+    image: 'https://i.imgur.com/6ApxjHs.jpg',
   },
   {
     id: 'p1',
@@ -249,6 +261,7 @@ const PRODUCTS: Product[] = [
     reviewsCount: 14,
     description: 'Massive 2TB storage capacity with blazing fast NVMe read/write speeds. Never run out of space for your massive game library or heavy video projects. With advanced thermal control and power efficiency, this drive maintains peak sustained performance even during the most demanding file transfers and rendering tasks.',
     image: 'https://i.imgur.com/2btT2co.jpg',
+    isSoldOut: true,
   },
   {
     id: 'p7',
@@ -270,7 +283,7 @@ const PRODUCTS: Product[] = [
       },
       {
         id: 'r7',
-        author: 'PC Bodega Customer',
+        author: 'PC Supplier Customer',
         date: '2026-04-18',
         text: 'thank youu Pc Bodega ok po product arrived in bubble wrap and box bili po ako next time',
         avatar: 'https://img.lazcdn.com/g/ot/roc/525a7800b4483c306d6b2ec3943cbb85.jpg_x700q80.jpg_.webp'
@@ -300,11 +313,11 @@ export default function App() {
   const cartDiscount = (appliedVoucher === 'LABORDAY1000' || appliedVoucher === 'PCBBODEGA') ? cart.reduce((acc, item) => {
     let discount = 0;
     // Specific discounts for Samsung SSDs as requested
-    // p4: 1TB NVMe, p5: 2TB NVMe, p6: T7 Portable (variations)
+    // p4: 1TB NVMe, p5: 2TB NVMe, p6_1tb/p6_2tb: T7 Shield Portable
     if (item.product.name.toLowerCase().includes('samsung') && item.product.name.toLowerCase().includes('ssd')) {
-      if (item.product.id === 'p5' || (item.product.id === 'p6' && item.selectedVariant?.name.includes('2 Terabyte'))) {
+      if (item.product.id === 'p5' || item.product.id === 'p6_2tb') {
         discount = 890;
-      } else if (item.product.id === 'p4' || (item.product.id === 'p6' && item.selectedVariant?.name.includes('1 Terabyte'))) {
+      } else if (item.product.id === 'p4' || item.product.id === 'p6_1tb') {
         discount = 390;
       }
     }
@@ -546,7 +559,7 @@ export default function App() {
   };
 
   return (
-    <div className="flex flex-col min-h-screen text-slate-100 flex-1 w-full max-w-[100vw] overflow-x-hidden">
+    <div className="flex flex-col min-h-screen text-white flex-1 w-full max-w-[100vw] overflow-x-hidden">
       {/* Top Banner */}
       <div className="bg-sky-600 min-h-10 flex items-center justify-center z-50 relative top-0 gap-2 px-4 shadow-[0_2px_10px_rgba(14,165,233,0.2)] py-2">
         <span className="text-xs sm:text-sm font-bold tracking-wider uppercase text-black italic text-center">
@@ -557,26 +570,43 @@ export default function App() {
       {/* Header */}
       <header className="sticky top-0 z-40 h-16 px-4 sm:px-8 border-b border-white/10 flex items-center justify-between bg-bg-surface backdrop-blur-md bg-opacity-90">
         <div className="flex items-center gap-4">
-          <button className="lg:hidden text-slate-300 hover:text-white" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
+          <button className="lg:hidden text-white hover:text-white" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
             <Menu className="w-6 h-6" />
           </button>
           
           <div 
-            className="flex items-center gap-3 cursor-pointer group" 
+            className="flex items-center gap-2 cursor-pointer group" 
             onClick={() => navigateTo('store')}
           >
-            <div className="w-8 h-8 bg-sky-500 rounded-md flex items-center justify-center font-bold text-black italic text-lg transition-transform group-hover:scale-105">
-              PB
+            <div className="w-10 h-10 overflow-hidden rounded-lg border border-white/10 transition-transform group-hover:scale-105">
+              <img 
+                src="https://i.imgur.com/Fv6UKsE.jpeg" 
+                alt="PC Supplier Logo" 
+                className="w-full h-full object-cover"
+              />
             </div>
-            <span className="text-xl font-bold tracking-tighter uppercase hidden sm:inline-block">PC Bodega</span>
+            <span className="text-xl font-bold tracking-tighter uppercase hidden sm:inline-block">PC Supplier</span>
           </div>
         </div>
 
-        <nav className="hidden lg:flex gap-8 text-sm font-medium text-slate-400">
+        <nav className="hidden lg:flex gap-8 text-sm font-medium text-white/50 items-center">
           <button onClick={() => navigateTo('store')} className={(view === 'store' || view === 'product') ? 'text-sky-400 font-bold' : 'hover:text-white transition-colors'}>Home</button>
           <button onClick={() => navigateTo('tracking')} className={view === 'tracking' ? 'text-sky-400 font-bold' : 'hover:text-white transition-colors'}>Track Order</button>
           <button onClick={() => navigateTo('warehouse')} className={view === 'warehouse' ? 'text-sky-400 font-bold' : 'hover:text-white transition-colors'}>Our Warehouse</button>
           <button onClick={() => navigateTo('about')} className={view === 'about' ? 'text-sky-400 font-bold' : 'hover:text-white transition-colors'}>About Us</button>
+          {user && (
+            <button 
+              onClick={() => { navigateTo('dashboard'); setView('dashboard'); }} 
+              className={`flex items-center gap-2 relative ${view === 'dashboard' ? 'text-sky-400 font-bold' : 'hover:text-white transition-colors'}`}
+            >
+              Messages
+              {unreadCount > 0 && (
+                <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full animate-pulse border border-white/20">
+                  {unreadCount}
+                </span>
+              )}
+            </button>
+          )}
           {isAdmin && <button onClick={() => navigateTo('admin')} className={view === 'admin' ? 'text-orange-400 font-bold' : 'text-orange-500/70 hover:text-orange-400 transition-colors'}>Seller Dashboard</button>}
         </nav>
 
@@ -585,10 +615,10 @@ export default function App() {
             {user ? (
               <>
                 <img src={user.photoURL || `https://ui-avatars.com/api/?name=${user.displayName || user.email}&background=0ea5e9&color=fff`} alt="" className="w-8 h-8 rounded-full border border-white/10" />
-                <span className="text-[10px] font-bold text-slate-400 hidden sm:inline-block group-hover:text-white uppercase tracking-wider">{isAdmin ? 'Seller Mode' : 'Dashboard'}</span>
+                <span className="text-[10px] font-bold text-white/50 hidden sm:inline-block group-hover:text-white uppercase tracking-wider">{isAdmin ? 'Seller Mode' : 'Dashboard'}</span>
               </>
             ) : (
-              <div className="flex items-center gap-2 text-[10px] uppercase font-bold tracking-widest text-slate-400 hover:text-white transition-colors border border-white/10 px-4 py-2 rounded-xl">
+              <div className="flex items-center gap-2 text-[10px] uppercase font-bold tracking-widest text-white/70 hover:text-white transition-colors border border-white/10 px-4 py-2 rounded-xl">
                  <User className="w-3.5 h-3.5" />
                  <span>Login / Register</span>
               </div>
@@ -623,7 +653,7 @@ export default function App() {
                 <button onClick={() => { navigateTo('tracking'); setIsMobileMenuOpen(false); }} className="text-left py-2 hover:text-sky-400">Track Order</button>
                 <button onClick={() => { navigateTo('warehouse'); setIsMobileMenuOpen(false); }} className="text-left py-2 hover:text-sky-400">Our Warehouse</button>
                 <button onClick={() => { navigateTo('about'); setIsMobileMenuOpen(false); }} className="text-left py-2 hover:text-sky-400">About Us</button>
-                <button onClick={() => { loginRedirect(); setIsMobileMenuOpen(false); }} className="text-left py-2 text-slate-400 border-t border-white/5 pt-4">{user ? 'My Dashboard' : 'Login / Register'}</button>
+                <button onClick={() => { loginRedirect(); setIsMobileMenuOpen(false); }} className="text-left py-2 text-white/60 border-t border-white/5 pt-4">{user ? 'My Dashboard' : 'Login / Register'}</button>
              </div>
           </motion.div>
         )}
@@ -743,11 +773,11 @@ export default function App() {
       {/* Footer */}
       {(view === 'store' || view === 'warehouse' || view === 'about' || view === 'product') && (
         <footer className="h-10 mt-auto bg-[#0A0B0D] px-4 sm:px-8 flex items-center justify-between text-[10px] text-slate-600 border-t border-white/5 uppercase tracking-widest relative z-10 w-full">
-          <span>© 2026 PC Bodega Customs</span>
+          <span>© 2026 PC Supplier Customs</span>
           <span className="hidden sm:inline-block text-sky-500/70">Verified Retailer • Manila, PH</span>
           <div className="flex gap-4">
-            <span className="hover:text-slate-400 cursor-pointer transition-colors">Terms</span>
-            <span className="hover:text-slate-400 cursor-pointer transition-colors">Warranty</span>
+            <span className="hover:text-white cursor-pointer transition-colors">Terms</span>
+            <span className="hover:text-white cursor-pointer transition-colors">Warranty</span>
           </div>
         </footer>
       )}
@@ -773,16 +803,16 @@ export default function App() {
               <div className="flex items-center justify-between p-6 border-b border-white/10">
                 <div>
                   <h2 className="text-xl font-bold tracking-tight mb-1">Active Cart</h2>
-                  <p className="text-slate-500 text-xs uppercase tracking-widest">Secure Checkout Session</p>
+                  <p className="text-white/60 text-xs uppercase tracking-widest">Secure Checkout Session</p>
                 </div>
-                <button onClick={() => setIsCartOpen(false)} className="p-2 hover:bg-white/5 rounded-lg transition-colors text-slate-400 hover:text-white">
+                <button onClick={() => setIsCartOpen(false)} className="p-2 hover:bg-white/5 rounded-lg transition-colors text-white/60 hover:text-white">
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
               <div className="flex-1 overflow-y-auto p-6 space-y-4">
                 {cart.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-full text-slate-500 gap-4">
+                  <div className="flex flex-col items-center justify-center h-full text-white/40 gap-4">
                     <ShoppingCart className="w-16 h-16 opacity-20" />
                     <p className="font-medium">Your cart is empty.</p>
                   </div>
@@ -804,9 +834,9 @@ export default function App() {
                           {item.selectedVariant ? (
                              <p className="text-xs text-sky-400 font-medium mb-1">Variant: {item.selectedVariant.name}</p>
                           ) : (
-                             <p className="text-[10px] text-slate-500 mb-1">{item.product.category}</p>
+                             <p className="text-[10px] text-white/50 mb-1">{item.product.category}</p>
                           )}
-                          <p className="text-xs text-slate-500">Qty: {item.quantity}</p>
+                          <p className="text-xs text-white/50">Qty: {item.quantity}</p>
                         </div>
                         <div className="flex items-center justify-between mt-2">
                           <p className="font-mono text-sky-400 font-bold tracking-tight">
@@ -866,9 +896,9 @@ function Storefront({ products, onProductClick, onAddToCart, activeCategory, set
       {/* Website Banner */}
       <div className="w-full h-auto overflow-hidden rounded-xl sm:rounded-2xl border border-white/10 relative shadow-xl">
          <img 
-            src="https://i.imgur.com/v7LCEd5.jpg" 
-            alt="PC Bodega Banner" 
-            className="w-full h-[160px] sm:h-[300px] md:h-[400px] object-cover object-center" 
+            src="https://i.imgur.com/gElyg3z.jpeg" 
+            alt="PC Supplier Banner" 
+            className="w-full h-[180px] sm:h-[350px] md:h-[450px] object-cover object-center" 
          />
          <div className="absolute inset-0 bg-gradient-to-t from-[#0A0B0D] via-[#0A0B0D]/20 to-transparent opacity-90" />
          <div className="absolute bottom-4 left-4 sm:bottom-6 sm:left-6 md:left-8">
@@ -882,7 +912,7 @@ function Storefront({ products, onProductClick, onAddToCart, activeCategory, set
         
         {/* Mobile Category Dropdown */}
         <div className="lg:hidden w-full">
-           <label className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 block">Categories</label>
+           <label className="text-xs font-bold text-white/50 uppercase tracking-widest mb-2 block">Categories</label>
            <select 
              className="w-full bg-bg-surface border border-white/10 text-white rounded-xl px-4 py-3 outline-none focus:border-sky-500 appearance-none font-medium"
              value={activeCategory || ''}
@@ -916,7 +946,7 @@ function Storefront({ products, onProductClick, onAddToCart, activeCategory, set
                     return (
                       <li 
                         key={item} 
-                        className={`cursor-pointer transition-colors ${isActive ? 'text-sky-400 font-bold' : 'text-slate-500 hover:text-white'}`}
+                        className={`cursor-pointer transition-colors ${isActive ? 'text-sky-400 font-bold' : 'text-white/50 hover:text-white'}`}
                         onClick={() => setActiveCategory(subcat)}
                       >
                         {item}
@@ -935,7 +965,7 @@ function Storefront({ products, onProductClick, onAddToCart, activeCategory, set
             <h2 className="text-2xl md:text-3xl font-light">
               {activeCategory ? <span className="font-bold text-white">{activeCategory}</span> : "Hardware"} <span className="text-sky-500 font-bold italic">{activeCategory ? "Products" : "Essentials"}</span>
             </h2>
-            <span className="text-xs text-slate-500 uppercase tracking-widest hidden sm:inline-block">
+            <span className="text-xs text-white/50 uppercase tracking-widest hidden sm:inline-block">
               {filteredProducts.length} Items
             </span>
           </div>
@@ -965,31 +995,37 @@ function Storefront({ products, onProductClick, onAddToCart, activeCategory, set
                 
                 <div className="flex flex-col flex-1">
                   <h3 className="font-medium text-[15px] mb-1 leading-tight group-hover:text-sky-400 transition-colors">{product.name}</h3>
-                  {product.isLastStock && (
+                  {product.isLastStock && !product.isSoldOut && (
                     <div className="flex items-center gap-1.5 mb-2 bg-red-500/10 border border-red-500/20 px-2 py-0.5 rounded w-fit">
                        <Zap className="w-3 h-3 text-red-500 fill-red-500" />
                        <span className="text-[10px] font-bold text-red-500 uppercase tracking-tighter">Last Stock Left</span>
                     </div>
                   )}
+                  {product.isSoldOut && (
+                    <div className="flex items-center gap-1.5 mb-2 bg-red-500/10 border border-red-500/20 px-2.5 py-1 rounded w-fit">
+                       <span className="text-xs font-black text-red-500 uppercase tracking-widest">Sold Out</span>
+                    </div>
+                  )}
                   <div className="flex items-center gap-1 mb-2">
-                      <div className="flex text-yellow-400 text-xs">
-                          {product.rating ? ('★'.repeat(Math.round(product.rating)) + '☆'.repeat(5 - Math.round(product.rating))) : '★★★★★'}
-                      </div>
-                      <span className="text-[10px] text-slate-500">({product.reviewsCount || 0})</span>
+                       <div className="flex text-yellow-400 text-xs">
+                           {product.rating ? ('★'.repeat(Math.round(product.rating)) + '☆'.repeat(5 - Math.round(product.rating))) : '★★★★★'}
+                       </div>
+                       <span className="text-[10px] text-white/40">({product.reviewsCount || 0})</span>
                   </div>
-                  <p className="text-slate-400 text-xs line-clamp-2 mb-4 leading-relaxed flex-1">
+                  <p className="text-white/70 text-xs line-clamp-2 mb-4 leading-relaxed flex-1">
                     {product.description}
                   </p>
                   
                   <div className="flex justify-between items-center mt-auto pt-2 border-t border-white/5">
-                    <span className="font-bold text-sky-400 font-mono tracking-tight text-lg">
+                    <span className={`font-bold font-mono tracking-tight text-lg ${product.isSoldOut ? 'text-red-500/70 line-through' : 'text-sky-400'}`}>
                       {product.variations ? `From ${formatPHP(Math.min(...product.variations.map(v=>v.price)))}` : formatPHP(product.price)}
                     </span>
                     <button 
+                      disabled={product.isSoldOut}
                       onClick={(e) => { e.stopPropagation(); if(!product.variations) onAddToCart(product); else onProductClick(product); }}
-                      className="p-2 bg-white/5 hover:bg-sky-500 hover:text-black rounded-lg transition-colors group-hover:bg-white/10"
+                      className={`p-2 rounded-lg transition-colors ${product.isSoldOut ? 'bg-white/5 text-slate-600 cursor-not-allowed' : 'bg-white/5 hover:bg-sky-500 hover:text-black group-hover:bg-white/10'}`}
                     >
-                      <Plus className="w-4 h-4" />
+                      {product.isSoldOut ? <span className="text-[10px] uppercase font-black px-1">Sold</span> : <Plus className="w-4 h-4" />}
                     </button>
                   </div>
                 </div>
@@ -997,7 +1033,7 @@ function Storefront({ products, onProductClick, onAddToCart, activeCategory, set
             ))}
             
             {filteredProducts.length === 0 && (
-              <div className="col-span-full py-12 text-center text-slate-500 border border-dashed border-white/10 rounded-2xl">
+              <div className="col-span-full py-12 text-center text-white/40 border border-dashed border-white/10 rounded-2xl">
                  No products found for this category.
               </div>
             )}
@@ -1016,7 +1052,7 @@ function ProductView({ product, onAddToCart, onBack }: { product: Product, onAdd
 
   return (
      <div className="max-w-6xl mx-auto px-3 sm:px-6 lg:px-8 py-6 sm:py-12">
-        <button onClick={onBack} className="flex items-center gap-2 text-slate-400 hover:text-white mb-6 sm:mb-8 transition-colors group text-xs sm:text-sm font-bold uppercase tracking-widest">
+        <button onClick={onBack} className="flex items-center gap-2 text-white/70 hover:text-white mb-6 sm:mb-8 transition-colors group text-xs sm:text-sm font-bold uppercase tracking-widest">
           <ChevronLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" /> Back to Store
         </button>
 
@@ -1030,10 +1066,15 @@ function ProductView({ product, onAddToCart, onBack }: { product: Product, onAdd
                  <span className="text-sky-500 text-[10px] sm:text-xs font-bold uppercase tracking-widest">{product.category} {product.subcategory && `> ${product.subcategory}`}</span>
                </div>
                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight mb-2 leading-tight">{product.name}</h1>
-               {product.isLastStock && (
+               {product.isLastStock && !product.isSoldOut && (
                  <div className="flex items-center gap-2 mb-4 bg-red-500/10 border border-red-500/20 px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg w-fit animate-pulse">
                     <Zap className="w-3.5 h-3.5 text-red-500 fill-red-500" />
                     <span className="text-[10px] sm:text-xs font-bold text-red-500 uppercase tracking-widest leading-none">Last inventory items remaining</span>
+                 </div>
+               )}
+               {product.isSoldOut && (
+                 <div className="flex items-center gap-2 mb-4 bg-red-500/10 border border-red-500/20 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg w-fit">
+                    <span className="text-xs sm:text-sm font-black text-red-500 uppercase tracking-widest leading-none">Sold Out</span>
                  </div>
                )}
                <div className="flex items-center gap-2 mb-4 sm:mb-6">
@@ -1044,19 +1085,25 @@ function ProductView({ product, onAddToCart, onBack }: { product: Product, onAdd
                      {product.reviewsCount || 0} reviews
                    </span>
                </div>
-               <div className="text-2xl sm:text-3xl font-mono text-sky-400 font-bold tracking-tighter mb-4 sm:mb-6">{formatPHP(activePrice)}</div>
+               <div className="text-2xl sm:text-3xl font-mono font-bold tracking-tighter mb-4 sm:mb-6">
+                 {product.isSoldOut ? (
+                   <span className="text-red-500 line-through opacity-70">{formatPHP(activePrice)}</span>
+                 ) : (
+                   <span className="text-sky-400">{formatPHP(activePrice)}</span>
+                 )}
+               </div>
                
-               <p className="text-slate-300 text-xs sm:text-sm leading-relaxed mb-6 sm:mb-8">{product.description}</p>
+               <p className="text-white/90 text-xs sm:text-sm leading-relaxed mb-6 sm:mb-8">{product.description}</p>
                
                {product.variations && product.variations.length > 0 && (
                  <div className="mb-6 sm:mb-8">
-                    <h4 className="text-[10px] sm:text-xs font-bold uppercase tracking-wider mb-2 sm:mb-3 text-slate-500">Select Variation</h4>
+                    <h4 className="text-[10px] sm:text-xs font-bold uppercase tracking-wider mb-2 sm:mb-3 text-white/50">Select Variation</h4>
                     <div className="flex flex-wrap gap-2 sm:gap-3">
                        {product.variations.map(variant => (
                          <button 
                            key={variant.id}
                            onClick={() => setSelectedVariant(variant)}
-                           className={`px-3 sm:px-4 py-2 border rounded-lg text-xs sm:text-sm font-bold transition-all ${selectedVariant?.id === variant.id ? 'border-sky-500 bg-sky-500/10 text-sky-400' : 'border-white/10 text-slate-300 hover:border-white/30 hover:bg-white/5'}`}
+                           className={`px-3 sm:px-4 py-2 border rounded-lg text-xs sm:text-sm font-bold transition-all ${selectedVariant?.id === variant.id ? 'border-sky-500 bg-sky-500/10 text-sky-400' : 'border-white/10 text-white/80 hover:border-white/30 hover:bg-white/5'}`}
                          >
                             {variant.name}
                          </button>
@@ -1067,10 +1114,11 @@ function ProductView({ product, onAddToCart, onBack }: { product: Product, onAdd
 
                <div className="mt-auto pt-6 sm:pt-8 border-t border-white/10">
                  <button 
+                   disabled={product.isSoldOut}
                    onClick={() => onAddToCart(product, selectedVariant)}
-                   className="w-full bg-sky-500 hover:bg-sky-400 text-black font-extrabold py-3.5 sm:py-4 rounded-xl transition-all flex items-center justify-center gap-2 uppercase tracking-widest text-xs sm:text-sm shadow-lg shadow-sky-500/20"
+                   className={`w-full font-extrabold py-3.5 sm:py-4 rounded-xl transition-all flex items-center justify-center gap-2 uppercase tracking-widest text-xs sm:text-sm shadow-lg ${product.isSoldOut ? 'bg-red-500/10 text-red-500 border border-red-500/20 cursor-not-allowed' : 'bg-sky-500 hover:bg-sky-400 text-black shadow-sky-500/20'}`}
                  >
-                   <ShoppingCart className="w-5 h-5 shrink-0" /> Add to Cart
+                   {product.isSoldOut ? 'OUT OF STOCK' : <><ShoppingCart className="w-5 h-5 shrink-0" /> Add to Cart</>}
                  </button>
                </div>
            </div>
@@ -1083,7 +1131,7 @@ function ProductView({ product, onAddToCart, onBack }: { product: Product, onAdd
              <div className="bg-bg-card border border-white/5 rounded-2xl p-10 text-center flex flex-col items-center justify-center">
                 <MessageSquare className="w-12 h-12 text-slate-600 mb-4" />
                 <h3 className="text-lg font-medium text-slate-300 mb-2">No reviews yet</h3>
-                <p className="text-slate-500 text-sm max-w-md">Real customer feedback and verified purchase photos will be displayed here once submitted.</p>
+                <p className="text-white/70 text-sm max-w-md">Real customer feedback and verified purchase photos will be displayed here once submitted.</p>
              </div>
            ) : (
              <div className="space-y-6">
@@ -1146,8 +1194,8 @@ function WarehouseView() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
       <div className="mb-10 text-center max-w-2xl mx-auto">
         <h2 className="text-4xl font-bold tracking-tight uppercase mb-4">Our <span className="text-sky-500 italic">Warehouse</span></h2>
-        <p className="text-slate-400 text-sm leading-relaxed">
-          Welcome to the heart of PC Bodega operations. We maintain direct stock of thousands of premium PC parts, managing massive inventory to ensure the components you need are available immediately for shipment or pickup.
+        <p className="text-white/80 text-sm leading-relaxed">
+          Welcome to the heart of PC Supplier operations. We maintain direct stock of thousands of premium PC parts, managing massive inventory to ensure the components you need are available immediately for shipment or pickup.
         </p>
       </div>
       <div className="columns-1 md:columns-2 lg:columns-3 gap-6 space-y-6">
@@ -1194,7 +1242,7 @@ function DeliveryPopup({ isOpen, onClose }: { isOpen: boolean, onClose: () => vo
                
                <h3 className="text-3xl md:text-4xl font-bold tracking-tight mb-4 uppercase">
                   BIG DEAL <br />
-                  <span className="text-sky-500 italic">SAMSUNG T7</span>
+                  <span className="text-sky-500 italic">SAMSUNG T7 SHIELD</span>
                </h3>
                
                <p className="text-slate-400 text-sm leading-relaxed mb-8 max-w-sm">
@@ -1244,6 +1292,26 @@ function AdminDashboard({ onOpenChat }: { onOpenChat: (id: string) => void }) {
       handleFirestoreError(err, OperationType.GET, 'chats');
       setLoading(false);
     });
+
+    // AUTO-FIX: Payment Confirmed for Samsung orders as requested by user
+    const autoConfirmSamsung = async () => {
+      try {
+        const qFix = query(collection(db, 'orders'), where('status', '==', 'pending'));
+        const fixSnap = await getDocs(qFix);
+        for (const orderDoc of fixSnap.docs) {
+          const data = orderDoc.data();
+          const hasSamsung = data.items?.some((it: any) => 
+            it.name.toLowerCase().includes('samsung') && it.name.toLowerCase().includes('ssd')
+          );
+          if (hasSamsung) {
+            await setDoc(orderDoc.ref, { status: 'paid' }, { merge: true });
+          }
+        }
+      } catch (e) {
+        console.error('AutoFix failed:', e);
+      }
+    };
+    autoConfirmSamsung();
 
     return () => {
       unsubOrders();
@@ -1299,8 +1367,8 @@ function AdminDashboard({ onOpenChat }: { onOpenChat: (id: string) => void }) {
                                  order.status === 'paid' ? 'bg-sky-500/20 text-sky-400 border-sky-500/20' :
                                  'bg-green-500/20 text-green-400 border-green-500/20'
                                }`}>
-                                 {order.status === 'pending' ? 'Unpaid' : 
-                                  order.status === 'paid' ? 'Paid (Deliver Today)' : 
+                                 {order.status === 'pending' ? 'Awaiting Payment Verification' : 
+                                  order.status === 'paid' ? 'Payment Confirmed - Same Day Delivery' : 
                                   order.status}
                                </span>
                            </div>
@@ -1382,8 +1450,8 @@ function AdminDashboard({ onOpenChat }: { onOpenChat: (id: string) => void }) {
                                 }}
                                 className="bg-black/40 border border-white/10 text-[10px] font-bold uppercase rounded p-1 text-sky-400 outline-none"
                               >
-                                <option value="pending">Unpaid</option>
-                                <option value="paid">Paid (Deliver Today)</option>
+                                <option value="pending">Awaiting Payment Verification</option>
+                                <option value="paid">Payment Confirmed - Same Day Delivery</option>
                                 <option value="completed">Completed</option>
                                 <option value="cancelled">Cancelled</option>
                               </select>
@@ -1434,6 +1502,8 @@ function AdminDashboard({ onOpenChat }: { onOpenChat: (id: string) => void }) {
 function AdminChatView({ chatId, onBack, pendingOrder, onClearPending }: { chatId: string, onBack: () => void, pendingOrder?: any, onClearPending?: () => void }) {
   const [messages, setMessages] = useState<any[]>([]);
   const [inputText, setInputText] = useState('');
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editInputText, setEditInputText] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [zoomImage, setZoomImage] = useState<string | null>(null);
   const [isTyping, setIsTyping] = useState(false);
@@ -1560,6 +1630,20 @@ function AdminChatView({ chatId, onBack, pendingOrder, onClearPending }: { chatI
         hasAdminUnread: !isUserAdmin,
         hasUserUnread: isUserAdmin
       }, { merge: true });
+    } catch (err) {
+      console.error(err);
+    }
+  };
+  
+  const saveEdit = async (messageId: string) => {
+    if (!editInputText.trim()) return;
+    try {
+      await setDoc(doc(db, 'chats', chatId, 'messages', messageId), {
+        text: editInputText,
+        isEdited: true,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+      setEditingMessageId(null);
     } catch (err) {
       console.error(err);
     }
@@ -1695,42 +1779,79 @@ function AdminChatView({ chatId, onBack, pendingOrder, onClearPending }: { chatI
                </div>
              )}
 
-             {messages.map((m) => (
-               <div key={m.id} className={`flex ${m.senderId === 'system' ? 'justify-center w-full my-4' : (m.senderId === auth.currentUser?.uid ? 'justify-end' : 'justify-start')}`}>
-                  <div className={`
-                    ${m.senderId === 'system' 
-                      ? 'max-w-[90%] bg-sky-500/10 border border-sky-500/20 text-sky-400 p-3 sm:p-4 text-center rounded-xl' 
-                      : (m.senderId === auth.currentUser?.uid 
-                        ? 'max-w-[85%] bg-sky-500 text-black font-medium p-3 sm:p-4 rounded-2xl shadow-lg' 
-                        : 'max-w-[85%] bg-white/5 text-slate-300 border border-white/5 p-3 sm:p-4 rounded-2xl')}
-                    text-xs sm:text-sm relative overflow-hidden
-                  `}>
-                     {m.imageUrl && (
-                       <img 
-                         src={m.imageUrl} 
-                         alt="Uploaded Content" 
-                         onClick={() => setZoomImage(m.imageUrl)}
-                         className="w-full max-h-60 sm:max-h-80 object-cover rounded-lg mb-2 shadow-sm border border-white/5 cursor-zoom-in hover:opacity-90 transition-opacity" 
-                         referrerPolicy="no-referrer"
-                       />
-                     )}
-                     {m.text && (
-                       <div className="markdown-body">
-                         <Markdown 
-                           remarkPlugins={[remarkGfm]}
-                           components={{
-                             a: ({ ...props }) => <a {...props} className="text-current underline hover:opacity-80 break-all" target="_blank" rel="noopener noreferrer" />,
-                             p: ({ ...props }) => <p {...props} className="whitespace-pre-line leading-relaxed" />
-                           }}
-                         >
-                           {m.text}
-                         </Markdown>
-                       </div>
-                     )}
-                     {m.senderId === 'system' && <div className="absolute top-0 right-0 p-1 opacity-20"><Zap className="w-10 h-10 sm:w-12 sm:h-12" /></div>}
-                  </div>
-               </div>
-             ))}
+             {messages.map((m) => {
+               const isUserAdmin = auth.currentUser?.email === 'paoloesteban75@gmail.com' || auth.currentUser?.email === 'akolangpo@pcbodega.com';
+               const isOwnMessage = m.senderId === auth.currentUser?.uid;
+               const canEdit = isUserAdmin && isOwnMessage && m.text; // Admin can edit their own text messages
+
+               return (
+                <div key={m.id} className={`flex ${m.senderId === 'system' ? 'justify-center w-full my-4' : (m.senderId === auth.currentUser?.uid ? 'justify-end' : 'justify-start')} group`}>
+                   <div className={`
+                     ${m.senderId === 'system' 
+                       ? 'max-w-[90%] bg-sky-500/10 border border-sky-500/20 text-sky-400 p-3 sm:p-4 text-center rounded-xl' 
+                       : (m.senderId === auth.currentUser?.uid 
+                         ? 'max-w-[85%] bg-sky-500 text-black font-medium p-3 sm:p-4 rounded-2xl shadow-lg' 
+                         : 'max-w-[85%] bg-white/5 text-slate-300 border border-white/5 p-3 sm:p-4 rounded-2xl')}
+                     text-xs sm:text-sm relative overflow-hidden group/msg
+                   `}>
+                      {m.imageUrl && (
+                        <img 
+                          src={m.imageUrl} 
+                          alt="Uploaded Content" 
+                          onClick={() => setZoomImage(m.imageUrl)}
+                          className="w-full max-h-60 sm:max-h-80 object-cover rounded-lg mb-2 shadow-sm border border-white/5 cursor-zoom-in hover:opacity-90 transition-opacity" 
+                          referrerPolicy="no-referrer"
+                        />
+                      )}
+                      {m.text && (
+                        editingMessageId === m.id ? (
+                          <div className="flex flex-col gap-2 min-w-[200px]">
+                            <textarea 
+                              value={editInputText}
+                              onChange={(e) => setEditInputText(e.target.value)}
+                              className="w-full bg-white/20 border border-white/30 rounded-lg p-2 text-xs sm:text-sm outline-none text-white placeholder-white/50"
+                              rows={3}
+                            />
+                            <div className="flex justify-end gap-2">
+                              <button onClick={() => setEditingMessageId(null)} className="p-1 hover:bg-white/20 rounded-md transition-colors">
+                                <X className="w-3.5 h-3.5 text-white" />
+                              </button>
+                              <button onClick={() => saveEdit(m.id)} className="p-1 bg-white/20 hover:bg-white/30 rounded-md transition-colors">
+                                <Check className="w-3.5 h-3.5 text-white" />
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="markdown-body relative group-hover/msg:pr-6">
+                            <Markdown 
+                              remarkPlugins={[remarkGfm]}
+                              components={{
+                                a: ({ ...props }) => <a {...props} className="text-current underline hover:opacity-80 break-all" target="_blank" rel="noopener noreferrer" />,
+                                p: ({ ...props }) => <p {...props} className="whitespace-pre-line leading-relaxed" />
+                              }}
+                            >
+                              {m.text}
+                            </Markdown>
+                            {m.isEdited && <span className="text-[9px] opacity-40 block mt-1 italic">(edited)</span>}
+                            {canEdit && (
+                              <button 
+                                onClick={() => {
+                                  setEditingMessageId(m.id);
+                                  setEditInputText(m.text || '');
+                                }}
+                                className="absolute top-0 right-0 p-1 opacity-0 group-hover/msg:opacity-100 transition-opacity hover:bg-black/10 rounded"
+                              >
+                                <Pencil className="w-3 h-3 text-black/60" />
+                              </button>
+                            )}
+                          </div>
+                        )
+                      )}
+                      {m.senderId === 'system' && <div className="absolute top-0 right-0 p-1 opacity-20"><Zap className="w-10 h-10 sm:w-12 sm:h-12" /></div>}
+                   </div>
+                </div>
+               );
+             })}
              <div ref={scrollRef} />
 
              {isTyping && (
@@ -1856,23 +1977,29 @@ function AuthView({ onAuthSuccess }: { onAuthSuccess: () => void }) {
 
   return (
     <div className="max-w-md mx-auto px-4 py-20 flex flex-col items-center">
-       <div className="w-16 h-16 bg-sky-500 rounded-2xl flex items-center justify-center mb-8 italic font-black text-black text-2xl shadow-xl shadow-sky-500/20">PB</div>
-       <h2 className="text-3xl font-bold tracking-tighter uppercase mb-2">{isLogin ? 'Welcome Back' : 'Join PC Bodega'}</h2>
+       <div className="w-16 h-16 overflow-hidden rounded-2xl mb-8 shadow-xl shadow-sky-500/20">
+          <img 
+            src="https://i.imgur.com/Fv6UKsE.jpeg" 
+            alt="PC Supplier Logo" 
+            className="w-full h-full object-cover"
+          />
+       </div>
+       <h2 className="text-3xl font-bold tracking-tighter uppercase mb-2">{isLogin ? 'Welcome Back' : 'Join PC Supplier'}</h2>
        <p className="text-slate-500 text-sm mb-8 text-center">Manage your hardware orders and track delivery in real-time.</p>
        
        <form onSubmit={handleSubmit} className="w-full space-y-4">
           {!isLogin && (
             <div className="space-y-1.5">
-               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">Full Name</label>
+               <label className="text-[10px] font-bold text-white/50 uppercase tracking-widest px-1">Full Name</label>
                <input required type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full bg-bg-card border border-white/5 rounded-xl px-4 py-3.5 focus:border-sky-500 outline-none transition-all" placeholder="John Doe" />
             </div>
           )}
           <div className="space-y-1.5">
-             <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">Email or Username</label>
+             <label className="text-[10px] font-bold text-white/50 uppercase tracking-widest px-1">Email or Username</label>
              <input required type="text" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-bg-card border border-white/5 rounded-xl px-4 py-3.5 focus:border-sky-500 outline-none transition-all" placeholder={isLogin ? "akolangpo or name@example.com" : "name@example.com"} />
           </div>
           <div className="space-y-1.5">
-             <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-1">Password</label>
+             <label className="text-[10px] font-bold text-white/50 uppercase tracking-widest px-1">Password</label>
              <input required type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-bg-card border border-white/5 rounded-xl px-4 py-3.5 focus:border-sky-500 outline-none transition-all" placeholder="••••••••" />
           </div>
 
@@ -1883,7 +2010,7 @@ function AuthView({ onAuthSuccess }: { onAuthSuccess: () => void }) {
           </button>
        </form>
 
-       <button onClick={() => setIsLogin(!isLogin)} className="mt-8 text-xs text-slate-500 hover:text-sky-400 transition-colors uppercase tracking-[0.15em] font-bold">
+       <button onClick={() => setIsLogin(!isLogin)} className="mt-8 text-xs text-white/50 hover:text-sky-400 transition-colors uppercase tracking-[0.15em] font-bold">
           {isLogin ? "Don't have an account? Sign Up" : "Already have an account? Log In"}
        </button>
        
@@ -1937,13 +2064,13 @@ function UserDashboardView({ user, profile, onSignOut, onNavigate, unreadCount }
              </div>
 
              <div className="bg-bg-card border border-white/5 rounded-2xl sm:rounded-3xl p-2 flex lg:flex-col gap-1 overflow-x-auto lg:overflow-visible no-scrollbar">
-                <button onClick={() => setActiveTab('orders')} className={`whitespace-nowrap flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3.5 rounded-xl sm:rounded-2xl text-[11px] sm:text-xs font-bold transition-all ${activeTab === 'orders' ? 'bg-sky-500 text-black' : 'hover:bg-white/5 text-slate-400'}`}>
+                <button onClick={() => setActiveTab('orders')} className={`whitespace-nowrap flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3.5 rounded-xl sm:rounded-2xl text-[11px] sm:text-xs font-bold transition-all ${activeTab === 'orders' ? 'bg-sky-500 text-black' : 'hover:bg-white/5 text-white/60'}`}>
                    <History className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Orders
                 </button>
-                <button onClick={() => setActiveTab('profile')} className={`whitespace-nowrap flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3.5 rounded-xl sm:rounded-2xl text-[11px] sm:text-xs font-bold transition-all ${activeTab === 'profile' ? 'bg-sky-500 text-black' : 'hover:bg-white/5 text-slate-400'}`}>
+                <button onClick={() => setActiveTab('profile')} className={`whitespace-nowrap flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3.5 rounded-xl sm:rounded-2xl text-[11px] sm:text-xs font-bold transition-all ${activeTab === 'profile' ? 'bg-sky-500 text-black' : 'hover:bg-white/5 text-white/60'}`}>
                    <User className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Profile
                 </button>
-                <button onClick={() => setActiveTab('chat')} className={`whitespace-nowrap flex items-center justify-between gap-4 px-3 sm:px-4 py-2.5 sm:py-3.5 rounded-xl sm:rounded-2xl text-[11px] sm:text-xs font-bold transition-all ${activeTab === 'chat' ? 'bg-sky-500 text-black' : 'hover:bg-white/5 text-slate-400'}`}>
+                <button onClick={() => setActiveTab('chat')} className={`whitespace-nowrap flex items-center justify-between gap-4 px-3 sm:px-4 py-2.5 sm:py-3.5 rounded-xl sm:rounded-2xl text-[11px] sm:text-xs font-bold transition-all ${activeTab === 'chat' ? 'bg-sky-500 text-black' : 'hover:bg-white/5 text-white/60'}`}>
                    <div className="flex items-center gap-2 sm:gap-3">
                       <MessageSquare className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Support
                    </div>
@@ -1979,7 +2106,20 @@ function UserDashboardView({ user, profile, onSignOut, onNavigate, unreadCount }
                               <div className="p-6 flex flex-col md:flex-row justify-between gap-4">
                                  <div>
                                     <div className="flex items-center gap-3 mb-2">
-                                       <span className="text-xs font-mono font-bold text-slate-500">#{order.trackingNumber || 'PENDING'}</span>
+                                       <div className="flex items-center gap-2 bg-black/40 px-2 py-1 rounded-lg border border-white/5">
+                                          <span className="text-xs font-mono font-black text-white">#{order.trackingNumber || 'PENDING'}</span>
+                                          {order.trackingNumber && (
+                                            <button 
+                                              onClick={() => {
+                                                navigator.clipboard.writeText(order.trackingNumber);
+                                                alert('Tracking code copied to clipboard!');
+                                              }}
+                                              className="text-sky-500 hover:text-white transition-colors"
+                                            >
+                                              <Copy className="w-3 h-3" />
+                                            </button>
+                                          )}
+                                       </div>
                                        <span className={`text-[10px] px-2 py-0.5 rounded font-bold uppercase ${
                                          order.status === 'pending' ? 'bg-orange-500/20 text-orange-400' :
                                          order.status === 'paid' ? 'bg-sky-500/20 text-sky-400' :
@@ -1990,7 +2130,7 @@ function UserDashboardView({ user, profile, onSignOut, onNavigate, unreadCount }
                                           order.status}
                                        </span>
                                     </div>
-                                    <p className="text-xs text-slate-400">Total: {formatPHP(order.total)} • Placed on {order.createdAt?.toDate?.()?.toLocaleDateString()}</p>
+                                    <p className="text-xs text-white/60">Total: <span className="text-white font-bold">{formatPHP(order.total)}</span> • Placed on <span className="text-white/80">{order.createdAt?.toDate?.()?.toLocaleDateString()}</span></p>
                                  </div>
                                  <div className="flex items-center gap-3">
                                     {order.status === 'pending' && (
@@ -2037,7 +2177,7 @@ function UserDashboardView({ user, profile, onSignOut, onNavigate, unreadCount }
                          <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
                          <span className="text-sm font-bold uppercase tracking-widest text-slate-300">Live Support Thread</span>
                       </div>
-                      <span className="text-[10px] text-slate-500 font-mono italic">Connected to PC Bodega Admin</span>
+                      <span className="text-[10px] text-white/40 font-mono italic">Connected to PC Supplier Admin</span>
                    </div>
                    <div className="flex-1 overflow-hidden p-0">
                       <AdminChatView chatId={user.uid} onBack={() => {}} />
@@ -2087,20 +2227,20 @@ function ProfileChangeForm({ user, profile }: { user: FirebaseUser, profile: any
     <form onSubmit={handleUpdate} className="bg-bg-card border border-white/5 rounded-3xl p-8 space-y-6 max-w-2xl">
        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-1.5">
-             <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Full Name</label>
+             <label className="text-[10px] font-bold text-white/50 uppercase tracking-widest">Full Name</label>
              <input type="text" value={name} onChange={(e) => setName(e.target.value)} className="w-full bg-bg-surface border border-white/5 rounded-xl px-4 py-3 outline-none focus:border-sky-500 text-sm" />
           </div>
           <div className="space-y-1.5">
-             <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Phone Number</label>
+             <label className="text-[10px] font-bold text-white/50 uppercase tracking-widest">Phone Number</label>
              <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} className="w-full bg-bg-surface border border-white/5 rounded-xl px-4 py-3 outline-none focus:border-sky-500 text-sm" />
           </div>
        </div>
        <div className="space-y-1.5">
-          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Delivery Address</label>
+          <label className="text-[10px] font-bold text-white/50 uppercase tracking-widest">Delivery Address</label>
           <textarea rows={3} value={address} onChange={(e) => setAddress(e.target.value)} className="w-full bg-bg-surface border border-white/5 rounded-xl px-4 py-3 outline-none focus:border-sky-500 text-sm resize-none" />
        </div>
        <div className="space-y-1.5">
-          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">New Password (Leave blank to keep current)</label>
+          <label className="text-[10px] font-bold text-white/50 uppercase tracking-widest">New Password (Leave blank to keep current)</label>
           <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-bg-surface border border-white/5 rounded-xl px-4 py-3 outline-none focus:border-sky-500 text-sm" placeholder="••••••••" />
        </div>
        <button disabled={loading} type="submit" className="bg-sky-500 hover:bg-sky-400 text-black font-black py-4 px-12 rounded-xl uppercase tracking-widest transition-all">
@@ -2168,7 +2308,7 @@ function TrackingView() {
   return (
     <div className="max-w-4xl mx-auto px-4 py-20 flex flex-col items-center">
        <h1 className="text-4xl font-black uppercase tracking-tight mb-4 text-center">Track Your <span className="text-sky-500 italic">Package</span></h1>
-       <p className="text-slate-500 mb-12 text-center max-w-lg">Enter your PC Bodega tracking number to check real-time delivery status and rider location.</p>
+       <p className="text-white/40 mb-12 text-center max-w-lg">Enter your PC Supplier tracking number to check real-time delivery status and rider location.</p>
        
        <form onSubmit={handleSearch} className="w-full max-w-xl flex gap-3 mb-12">
           <input 
@@ -2195,11 +2335,22 @@ function TrackingView() {
                    <Zap className="w-5 h-5 text-green-500" />
                 </div>
                 <div>
-                   <h3 className="text-xl font-bold tracking-tighter uppercase">{result.status}</h3>
-                   <p className="text-[10px] text-slate-500 uppercase tracking-widest font-mono">Tracking: {result.number}</p>
+                   <h3 className="text-xl font-bold tracking-tighter uppercase text-white">{result.status}</h3>
+                   <div className="flex items-center gap-2 mt-1">
+                      <p className="text-[10px] text-white uppercase tracking-widest font-mono font-black">Tracking: {result.number}</p>
+                      <button 
+                        onClick={() => {
+                          navigator.clipboard.writeText(result.number);
+                          alert('Tracking code copied to clipboard!');
+                        }}
+                        className="text-sky-500 hover:text-white transition-colors"
+                      >
+                        <Copy className="w-3 h-3" />
+                      </button>
+                   </div>
                 </div>
              </div>
-             <p className="text-lg text-slate-300 leading-relaxed font-medium mb-4 italic">"{result.text}"</p>
+             <p className="text-lg text-white leading-relaxed font-bold mb-4 italic">"{result.text}"</p>
              <div className="flex gap-2">
                 <span className="text-[10px] bg-sky-500/10 text-sky-400 py-1 px-3 rounded-full font-bold uppercase tracking-widest">Same Day Dispatch</span>
                 <span className="text-[10px] bg-white/5 text-slate-500 py-1 px-3 rounded-full font-bold uppercase tracking-widest">Metro Manila Priority</span>
@@ -2231,7 +2382,7 @@ function TrackingView() {
             referrerPolicy="no-referrer-when-downgrade"
           />
        </div>
-       <p className="mt-4 text-[10px] text-slate-600 uppercase font-black tracking-widest">Live Rider Tracking Enabled • PC Bodega Warehouse Distribution Hub</p>
+       <p className="mt-4 text-[10px] text-white/30 uppercase font-black tracking-widest">Live Rider Tracking Enabled • PC Supplier Warehouse Distribution Hub</p>
     </div>
   );
 }
@@ -2239,7 +2390,7 @@ function TrackingView() {
 function AboutView({ onNavigate }: { onNavigate: (view: ViewState) => void }) {
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-20 text-center">
-      <h2 className="text-4xl font-bold tracking-tight uppercase mb-4">About <span className="text-sky-500 italic">PC Bodega</span></h2>
+      <h2 className="text-4xl font-bold tracking-tight uppercase mb-4">About <span className="text-sky-500 italic">PC Supplier</span></h2>
       <div className="bg-bg-card border border-white/10 rounded-2xl p-8 sm:p-12 shadow-2xl mt-12 text-justify">
           <p className="text-slate-300 leading-relaxed text-base sm:text-lg mb-6">
             We Started operations on August 1998 in a limited area along E. Rodriguez Avenue...
@@ -2302,7 +2453,7 @@ function CheckoutView({ cart, subtotal, discount, appliedVoucher, setAppliedVouc
             <h2 className="text-lg sm:text-xl font-bold uppercase mb-4 sm:mb-6 pb-4 border-b border-white/10 tracking-widest">Delivery</h2>
             <form id="checkout-form" onSubmit={onProceed} className="space-y-4 sm:space-y-5">
               <div className="space-y-1.5">
-                <label className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-widest px-1">Complete Name</label>
+                <label className="text-[10px] sm:text-xs font-bold text-white/50 uppercase tracking-widest px-1">Complete Name</label>
                 <input required type="text" className="w-full bg-bg-card border border-white/10 text-sm rounded-xl px-4 py-3 sm:py-3.5 outline-none focus:border-sky-500 transition-all shadow-xl" value={checkoutData.name} onChange={(e) => setCheckoutData({...checkoutData, name: e.target.value})} />
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
