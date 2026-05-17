@@ -119,7 +119,7 @@ const PRODUCTS: Product[] = [
   {
     id: 'p6_1tb',
     name: 'Samsung T7 Shield Portable SSD 1TB',
-    price: 2990,
+    price: 5500,
     category: 'SSD',
     subcategory: 'PORTABLE',
     rating: 5.0,
@@ -149,12 +149,11 @@ const PRODUCTS: Product[] = [
   {
     id: 'p6_2tb',
     name: 'Samsung T7 Shield Portable SSD 2TB',
-    price: 3790,
+    price: 6999,
     category: 'SSD',
     subcategory: 'PORTABLE',
     rating: 5.0,
     reviewsCount: 4,
-    isSoldOut: true,
     description: 'Massive 2TB rugged storage. The T7 Shield provides professional-grade durability with IP65 water and dust resistance. Its rubberized exterior and advanced thermal management ensure consistent performance even in challenging environments. Perfect for outdoor shoots or heavy workstation backups.',
     image: 'https://i.imgur.com/6ApxjHs.jpg',
   },
@@ -243,7 +242,7 @@ const PRODUCTS: Product[] = [
   {
     id: 'p4',
     name: 'Samsung 1TB NVMe M.2 SSD',
-    price: 3990,
+    price: 5500,
     category: 'SSD',
     subcategory: 'SAMSUNG',
     rating: 4.8,
@@ -254,14 +253,13 @@ const PRODUCTS: Product[] = [
   {
     id: 'p5',
     name: 'Samsung 2TB NVMe M.2 SSD',
-    price: 4990,
+    price: 6999,
     category: 'SSD',
     subcategory: 'SAMSUNG',
     rating: 4.9,
     reviewsCount: 14,
     description: 'Massive 2TB storage capacity with blazing fast NVMe read/write speeds. Never run out of space for your massive game library or heavy video projects. With advanced thermal control and power efficiency, this drive maintains peak sustained performance even during the most demanding file transfers and rendering tasks.',
     image: 'https://i.imgur.com/2btT2co.jpg',
-    isSoldOut: true,
   },
   {
     id: 'p7',
