@@ -1584,8 +1584,8 @@ function AdminChatView({ chatId, onBack, pendingOrder, onClearPending }: { chatI
   const [zoomImage, setZoomImage] = useState<string | null>(null);
   const [isTyping, setIsTyping] = useState(false);
   const [queueInfo] = useState(() => ({
-    pos: Math.floor(Math.random() * 3) + 1,
-    time: [3, 6, 7][Math.floor(Math.random() * 3)]
+    pos: Math.floor(Math.random() * 2) + 1,
+    time: Math.floor(Math.random() * 3) + 1
   }));
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
