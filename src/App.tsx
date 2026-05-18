@@ -1606,10 +1606,6 @@ function AdminChatView({ chatId, onBack, pendingOrder, onClearPending }: { chatI
   const [isUploading, setIsUploading] = useState(false);
   const [zoomImage, setZoomImage] = useState<string | null>(null);
   const [isTyping, setIsTyping] = useState(false);
-  const [queueInfo] = useState(() => ({
-    pos: Math.floor(Math.random() * 2) + 1,
-    time: Math.floor(Math.random() * 3) + 1
-  }));
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const initialized = useRef(false);
@@ -1788,29 +1784,6 @@ function AdminChatView({ chatId, onBack, pendingOrder, onClearPending }: { chatI
              <span className="text-[10px] text-slate-500 uppercase font-bold px-2 py-1 bg-white/5 rounded">Live Thread</span>
           </div>
           <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 custom-scrollbar relative">
-             {!(auth.currentUser?.email === 'paoloesteban75@gmail.com' || auth.currentUser?.email === 'akolangpo@pcbodega.com') && (
-               <motion.div 
-                 initial={{ opacity: 0, y: -10 }}
-                 animate={{ opacity: 1, y: 0 }}
-                 className="sticky top-0 z-10 bg-sky-500/10 border border-sky-500/20 backdrop-blur-md rounded-xl p-3 sm:p-4 mb-4 shadow-lg text-center"
-               >
-                 <div className="flex items-center justify-center gap-3 mb-2">
-                   <div className="flex flex-col items-center">
-                     <span className="text-[10px] text-sky-400 font-bold uppercase tracking-wider">Queue Position</span>
-                     <span className="text-xl font-black text-white">#{queueInfo.pos}</span>
-                   </div>
-                   <div className="w-px h-8 bg-sky-500/20" />
-                   <div className="flex flex-col items-center">
-                     <span className="text-[10px] text-sky-400 font-bold uppercase tracking-wider">Est. Wait</span>
-                     <span className="text-xl font-black text-white">{queueInfo.time}m</span>
-                   </div>
-                 </div>
-                 <p className="text-[10px] text-slate-400 leading-tight">
-                   Please leave your <span className="text-sky-400">concern</span> and <span className="text-sky-400">contact email/number</span>. We'll get back to you shortly!
-                 </p>
-               </motion.div>
-             )}
-
              {pendingOrder && (
                <div className="mx-auto max-w-sm mb-6 bg-sky-500/10 border border-sky-500/30 rounded-2xl p-4 shadow-xl">
                  <div className="flex items-start gap-4 mb-3 border-b border-sky-500/20 pb-4">
