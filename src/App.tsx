@@ -29,7 +29,8 @@ import {
   Camera,
   Copy,
   Check,
-  Pencil
+  Pencil,
+  Download
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { initializeApp } from 'firebase/app';
@@ -334,6 +335,17 @@ export default function App() {
   };
 
   useEffect(() => {
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      (window as any).deferredPrompt = e;
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (currUser) => {
       setUser(currUser);
       if (currUser) {
@@ -632,6 +644,22 @@ export default function App() {
         </nav>
 
         <div className="flex items-center gap-4">
+          {/* Download App Button */}
+          <button 
+            onClick={() => {
+              if ((window as any).deferredPrompt) {
+                (window as any).deferredPrompt.prompt();
+              } else {
+                alert('App is installable from your browser menu, or already installed!');
+              }
+            }}
+            className="flex items-center gap-1.5 sm:gap-2 text-[10px] uppercase font-bold tracking-widest text-[#0fbbf9] hover:bg-sky-500 hover:text-black transition-colors border border-sky-500/30 px-2 sm:px-4 py-1.5 sm:py-2 rounded-xl animate-pulse"
+          >
+             <Download className="w-3.5 h-3.5" />
+             <span className="hidden sm:inline-block">Download App for Live Updates</span>
+             <span className="sm:hidden">App</span>
+          </button>
+
           <div className="flex items-center gap-2 group cursor-pointer" onClick={loginRedirect}>
             {user ? (
               <>
@@ -770,12 +798,16 @@ export default function App() {
 
         <DeliveryPopup isOpen={showPopup} onClose={() => setShowPopup(false)} />
 
-        {/* Floating Chat Button for Users */}
-        {user && !isAdmin && (
+        {/* Floating Chat Button for Users / Guests */}
+        {!isAdmin && (
           <button 
             onClick={() => {
-              setSelectedChatId(user.uid);
-              setView('admin_chat');
+              if (user) {
+                setSelectedChatId(user.uid);
+                setView('admin_chat');
+              } else {
+                setView('auth');
+              }
             }}
             className={`fixed bottom-6 right-6 w-14 h-14 ${pendingOrder ? 'bg-orange-500 animate-bounce' : 'bg-sky-500'} text-black rounded-full shadow-2xl flex items-center justify-center hover:scale-110 transition-all z-40 group`}
           >
@@ -1850,6 +1882,16 @@ function AdminChatView({ chatId, onBack, pendingOrder, onClearPending }: { chatI
                  </button>
                </div>
              )}
+
+             {/* Default Nina Welcome Message */}
+             <div className="flex justify-start group w-full mb-6 mt-2">
+                <div className="max-w-[85%] bg-sky-500/10 border border-sky-500/20 text-sky-400 p-3 sm:p-4 rounded-xl rounded-bl-sm">
+                   <p className="whitespace-pre-wrap text-[13px] sm:text-sm leading-relaxed text-left flex items-start gap-2 sm:gap-3">
+                     <span className="text-lg sm:text-xl shrink-0 mt-0.5">👋</span>
+                     <span>Hi! This is Nina. We accept GCash, Maya, Visa/Mastercard (Debit or Credit). How can I help you today?</span>
+                   </p>
+                </div>
+             </div>
 
              {messages.map((m) => {
                const isUserAdmin = auth.currentUser?.email === 'paoloesteban75@gmail.com' || auth.currentUser?.email === 'akolangpo@pcbodega.com';
