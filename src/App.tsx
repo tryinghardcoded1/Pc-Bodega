@@ -355,18 +355,41 @@ export default function App() {
           });
         } else {
           // Individual user just listens to their own document
-          unsubUnread = onSnapshot(doc(db, 'chats', currUser.uid), (docSnap) => {
+          const unreadUnsub = onSnapshot(doc(db, 'chats', currUser.uid), (docSnap) => {
             if (docSnap.exists() && docSnap.data().hasUserUnread) {
-              setUnreadCount(1);
-              if (view !== 'dashboard') {
-                playNotificationSound();
-              }
+              setUnreadCount(prev => {
+                if (prev === 0) playNotificationSound();
+                return 1;
+              });
             } else {
               setUnreadCount(0);
             }
           }, (err) => {
             console.error('Error listening for user unreads', err);
           });
+
+          let lastPendingId: string | null = null;
+          const qOrder = query(collection(db, 'orders'), where('userId', '==', currUser.uid), where('status', '==', 'pending'));
+          const orderUnsub = onSnapshot(qOrder, (snap) => {
+            if (!snap.empty) {
+              const pDoc = snap.docs[0];
+              setPendingOrder({ id: pDoc.id, ...pDoc.data() });
+              if (lastPendingId !== pDoc.id) {
+                lastPendingId = pDoc.id;
+                setSelectedChatId(currUser.uid);
+                setView('admin_chat');
+                playNotificationSound();
+              }
+            } else {
+              setPendingOrder(null);
+              lastPendingId = null;
+            }
+          });
+
+          unsubUnread = () => {
+            unreadUnsub();
+            orderUnsub();
+          };
         }
         
         // Bootstrap admin record in Firestore if they are a designated admin
@@ -754,7 +777,7 @@ export default function App() {
               setSelectedChatId(user.uid);
               setView('admin_chat');
             }}
-            className="fixed bottom-6 right-6 w-14 h-14 bg-sky-500 text-black rounded-full shadow-2xl flex items-center justify-center hover:scale-110 transition-all z-40 group"
+            className={`fixed bottom-6 right-6 w-14 h-14 ${pendingOrder ? 'bg-orange-500 animate-bounce' : 'bg-sky-500'} text-black rounded-full shadow-2xl flex items-center justify-center hover:scale-110 transition-all z-40 group`}
           >
              <MessageSquare className="w-6 h-6" />
              {unreadCount > 0 && (
